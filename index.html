@@ -5294,14 +5294,14 @@ function renderSuplidores(tabActivo){
   const supVeh=DB.suplidores.filter(s=>(s.tipoSuplidor||'vehiculo')==='vehiculo');
   const supEmp=DB.suplidores.filter(s=>s.tipoSuplidor==='empresa');
   const supImp=DB.suplidores.filter(s=>s.tipoSuplidor==='importadora');
-  const lista=tabActivo==='vehiculo'?supVeh:tabActivo==='importadora'?supImp:supEmp;
+  const lista=tabActivo==='vehiculo'?supVeh:tabActivo==='empresa'?supEmp:supImp;
   function filasSup(arr){
     return arr.map((s,i)=>{
       const realIdx=DB.suplidores.findIndex(x=>(x.id||String(x))===s.id);
       return `<tr onclick="selSupl('${s.id}',this)" style="cursor:pointer">
         <td style="text-align:center"><input type="radio" name="sup-sel" onclick="event.stopPropagation();selSupl('${s.id}',this.closest('tr'))" style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue)"></td>
         <td style="font-size:11px;color:var(--gray);font-weight:600">${escHtml(s.supId||'—')}</td>
-        <td><span class="badge ${(s.tipoSuplidor||'vehiculo')==='vehiculo'?'badge-blue':'badge-green'}" style="font-size:10px">${(s.tipoSuplidor||'vehiculo')==='vehiculo'?'🚗 Vehículo':'🏢 Empresa'}</span></td>
+        <td><span class="badge ${(s.tipoSuplidor||'vehiculo')==='vehiculo'?'badge-blue':s.tipoSuplidor==='importadora'?'badge-yellow':'badge-green'}" style="font-size:10px">${(s.tipoSuplidor||'vehiculo')==='vehiculo'?'🚗 Vehículo':s.tipoSuplidor==='importadora'?'🏦 Importadora':'🏢 Empresa'}</span></td>
         <td style="font-weight:700">${escHtml(s.empresa||s.nombre||'—')}</td>
         <td style="font-size:13px">${escHtml(s.propietario||'—')}</td>
         <td style="font-size:12px;color:var(--gray)"><span style="font-size:10px;background:var(--blue3);color:var(--blue);border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px">${escHtml(s.tipoDoc||'RNC')}</span>${escHtml(s.rnc||'—')}</td>
@@ -5324,12 +5324,13 @@ function renderSuplidores(tabActivo){
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <button id="sup-btn-editar" disabled class="btn btn-sm" style="${ds}" onclick="supAccion('editar')">✏️ Editar</button>
         ${currentUser?.role==='admin'?`<button id="sup-btn-eliminar" disabled class="btn btn-sm" style="${ds}" onclick="supAccion('eliminar')">🗑 Eliminar</button>`:''}
-        <button class="btn btn-primary" onclick="nuevoSuplidor('${tabActivo}')">➕ Nuevo Suplidor</button>
+        <button class="btn btn-primary" onclick="nuevoSuplidor('${tabActivo}')">➕ Nuevo ${tabActivo==='vehiculo'?'Suplidor Vehículo':tabActivo==='importadora'?'Importadora':'Suplidor Empresa'}</button>
       </div>
     </div>
     <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--gray3)">
-      <button onclick="renderSuplidores('vehiculo')" class="btn" style="border-radius:8px 8px 0 0;border-bottom:none;${tabActivo==='vehiculo'?'background:var(--blue);color:#fff;':'background:var(--gray2);color:var(--navy);'}">🚗 Suplidores de Vehículos (${supVeh.length})</button>
-      <button onclick="renderSuplidores('empresa')" class="btn" style="border-radius:8px 8px 0 0;border-bottom:none;margin-left:4px;${tabActivo==='empresa'?'background:var(--blue);color:#fff;':'background:var(--gray2);color:var(--navy);'}">🏢 Suplidores de Empresa (${supEmp.length})</button>
+      <button onclick="renderSuplidores('vehiculo')" class="btn" style="border-radius:8px 8px 0 0;border-bottom:none;${tabActivo==='vehiculo'?'background:var(--blue);color:#fff;':'background:var(--gray2);color:var(--navy);'}">🚗 Vehículos (${supVeh.length})</button>
+      <button onclick="renderSuplidores('empresa')" class="btn" style="border-radius:8px 8px 0 0;border-bottom:none;margin-left:4px;${tabActivo==='empresa'?'background:var(--blue);color:#fff;':'background:var(--gray2);color:var(--navy);'}">🏢 Empresa (${supEmp.length})</button>
+      <button onclick="renderSuplidores('importadora')" class="btn" style="border-radius:8px 8px 0 0;border-bottom:none;margin-left:4px;${tabActivo==='importadora'?'background:var(--gold,#b45309);color:#fff;':'background:var(--gray2);color:var(--navy);'}">🏦 Importadora (${supImp.length})</button>
     </div>
     <div class="card"><div class="search-wrap"><input class="search-input" placeholder="Buscar por nombre, RNC, teléfono..." oninput="filterTable('sup-tbl',this.value)"></div>
       <div class="table-wrap"><table id="sup-tbl"><thead><tr>

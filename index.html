@@ -103,6 +103,7 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 .alert-notif .notif-msg{font-size:12px;color:#64748b}
 .alert-notif .notif-close{font-size:16px;color:#94a3b8;cursor:pointer;padding:0 4px}
 @keyframes slideIn{from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .chart-bar-wrap{display:flex;flex-direction:column;gap:10px}
 .chart-bar-row{display:flex;align-items:center;gap:10px}
@@ -681,6 +682,8 @@ function showPage(id){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const sb=document.getElementById('sidebar');const ov=document.getElementById('sidebar-overlay');
   if(sb&&window.innerWidth<=768){sb.classList.remove('open');if(ov)ov.classList.remove('open');}
+  // Limpiar intervalo de usuarios si navegamos a otra página
+  if(id!=='usuarios'&&window._usuariosRefreshInterval){clearInterval(window._usuariosRefreshInterval);window._usuariosRefreshInterval=null;}
   // Verificar acceso al módulo (solo para no-admin)
   if(id!=='dashboard'&&currentUser?.role!=='admin'&&!canAccess(id)){toast('No tienes acceso a este módulo','error');return;}
   document.getElementById('page-'+id)?.classList.add('active');
@@ -2135,6 +2138,13 @@ function renderUsuarios(){
     document.getElementById('page-usuarios').innerHTML='<div style="text-align:center;padding:48px;color:var(--gray)">🔒 Solo el administrador puede gestionar usuarios</div>';
     return;
   }
+  // Auto-refresh cada 15 segundos mientras la página está activa
+  clearInterval(window._usuariosRefreshInterval);
+  window._usuariosRefreshInterval=setInterval(()=>{
+    const pU=document.getElementById('page-usuarios');
+    if(pU&&pU.classList.contains('active')){_sincPresencia();renderUsuarios();}
+    else{clearInterval(window._usuariosRefreshInterval);}
+  },15000);
   const roles=DB.config.roles||[{id:'dueno',nombre:'Dueño'},{id:'secretaria',nombre:'Secretaria'},{id:'asistente',nombre:'Asistente'},{id:'tecnico',nombre:'Técnico'}];
   const MODS=[
     {id:'dashboard',label:'Dashboard'},{id:'informes',label:'Informe Mensual'},
@@ -2212,7 +2222,13 @@ function renderUsuarios(){
 
     <!-- TABLA USUARIOS -->
     <div class="card">
-      <div class="card-title">👥 Usuarios del sistema</div>
+      <div class="card-title" style="justify-content:space-between">
+        <span>👥 Usuarios del sistema</span>
+        <span id="usuarios-online-badge" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green);background:var(--green2);border-radius:20px;padding:4px 12px">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse-dot 1.5s infinite"></span>
+          ${(()=>{const ahora=Date.now();const en=(DB.users||[]).filter(u=>{let p={};try{p=JSON.parse(localStorage.getItem('fayre_presencia')||'{}');}catch{}const ult=p[u.id]||(DB.presencia||{})[u.id]||0;return ult>0&&(ahora-ult)<30000;});return en.length;})()}  en línea — actualización en vivo
+        </span>
+      </div>
       <div class="table-wrap"><table>
         <thead><tr>
           <th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th>
@@ -3094,6 +3110,14 @@ function _pingPresencia(){
   if(!DB.presencia)DB.presencia={};
   DB.presencia[currentUser.id]=ts;
   if(window._presenciaBC){try{window._presenciaBC.postMessage({uid:currentUser.id,ts});}catch{}}
+  // Sincronizar presencia a Firebase para visibilidad entre dispositivos
+  if(window._fbActivo&&typeof _fbDB!=='undefined'){
+    try{
+      const presObj={};
+      Object.keys(DB.presencia||{}).forEach(k=>{if(DB.presencia[k]>0)presObj[k]=DB.presencia[k];});
+      _fbDB.collection(_fbCol).doc('presencia').set({valor:JSON.stringify(presObj)}).catch(()=>{});
+    }catch(e){}
+  }
 }
 function _iniciarPresenciaGlobal(){
   if(!currentUser)return;
@@ -8215,7 +8239,7 @@ window.sDB = function(key){
 function fbActivarListeners(){
   const keys=['config','config_logo','users','vehiculos','clientes','suplidores',
     'ventas','cotizaciones','caja','gastos','nomina','nominaPagos',
-    'gastosVehiculos','cxp','cxc','autorizaciones'];
+    'gastosVehiculos','cxp','cxc','autorizaciones','presencia'];
   
   keys.forEach(key=>{
     _fbDB.collection(_fbCol).doc(key).onSnapshot(snap=>{
@@ -8231,6 +8255,18 @@ function fbActivarListeners(){
             if(!merged.find(u=>u.id===lu.id))merged.push(lu);
           });
           DB.users=merged.length>0?merged:DB.users;
+        } else if(key==='presencia'&&typeof val==='object'&&val!==null){
+          // Merge presencia remota con local
+          DB.presencia=Object.assign(DB.presencia||{},val);
+          // Escribir en localStorage para coherencia local
+          localStorage.setItem('fayre_presencia',JSON.stringify(DB.presencia));
+          // Refrescar tabla de usuarios si está activa (sin afectar otras páginas)
+          const pU=document.getElementById('page-usuarios');
+          if(pU&&pU.classList.contains('active')){
+            clearTimeout(window._presenciaRefreshTimer);
+            window._presenciaRefreshTimer=setTimeout(()=>{if(typeof renderUsuarios==='function')renderUsuarios();},300);
+          }
+          return; // No ejecutar el renderMap genérico
         } else if(key==='config_logo'){
           const logoVal=typeof val==='string'?val:(val&&val.logoData?val.logoData:'');
           if(logoVal&&logoVal.startsWith('data:')){
@@ -8284,7 +8320,7 @@ function fbActivarListeners(){
           caja:['caja'],gastosVeh:['gastosVehiculos','vehiculos'],
           cotizaciones:['cotizaciones','clientes'],
           autorizaciones:['autorizaciones'],
-          usuarios:['users'],config:[],
+          usuarios:['users','presencia'],config:[],
           informes:['ventas','gastos','cxc','gastosVehiculos','nomina'],
         };
         const afecta=keysParaPagina[pid]||[];

@@ -2145,6 +2145,11 @@ function renderUsuarios(){
     if(pU&&pU.classList.contains('active')){_sincPresencia();renderUsuarios();}
     else{clearInterval(window._usuariosRefreshInterval);}
   },15000);
+  // Asegurar que el usuario actual esté marcado en línea antes de renderizar
+  if(currentUser){
+    _pingPresencia();
+    _sincPresencia();
+  }
   const roles=DB.config.roles||[{id:'dueno',nombre:'Dueño'},{id:'secretaria',nombre:'Secretaria'},{id:'asistente',nombre:'Asistente'},{id:'tecnico',nombre:'Técnico'}];
   const MODS=[
     {id:'dashboard',label:'Dashboard'},{id:'informes',label:'Informe Mensual'},

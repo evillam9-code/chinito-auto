@@ -2222,17 +2222,51 @@ function renderInformes(){
 }
 
 // ══ USUARIOS ══
+
+// Actualiza SOLO los badges de estado en línea en la página usuarios
+// sin re-renderizar el formulario (evita perder el foco al escribir)
+function _actualizarBadgesOnlineUsuarios(){
+  const pU=document.getElementById('page-usuarios');
+  if(!pU||!pU.classList.contains('active'))return;
+  const ahora=Date.now();
+  let presGlobal={};try{presGlobal=JSON.parse(localStorage.getItem('fayre_presencia')||'{}');}catch{}
+  // Actualizar badge contador de en línea
+  const badge=document.getElementById('usuarios-online-badge');
+  if(badge){
+    const en=(DB.users||[]).filter(u=>{
+      const ult=presGlobal[u.id]||(DB.presencia||{})[u.id]||0;
+      return ult>0&&(ahora-ult)<30000;
+    }).length;
+    const span=badge.querySelector('span:last-child')||badge;
+    // Solo actualizar el número, no el HTML completo
+    const txt=badge.textContent;
+    const newTxt=txt.replace(/^\d+/,en.toString());
+    if(txt!==newTxt)badge.childNodes.forEach(n=>{if(n.nodeType===3&&/\d/.test(n.textContent))n.textContent=n.textContent.replace(/\d+/,en.toString());});
+  }
+  // Actualizar cada fila de estado en la tabla
+  (DB.users||[]).forEach((u,i)=>{
+    const cell=document.getElementById('user-status-'+u.id);
+    if(!cell)return;
+    const ult=presGlobal[u.id]||(DB.presencia||{})[u.id]||0;
+    const enLinea=ult>0&&(ahora-ult)<30000;
+    cell.innerHTML=enLinea
+      ?'<span style="display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#16a34a;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700"><span style="width:7px;height:7px;border-radius:50%;background:#16a34a;display:inline-block"></span>En línea</span>'
+      :'<span style="display:inline-flex;align-items:center;gap:5px;background:#f1f5f9;color:#64748b;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:#94a3b8;display:inline-block"></span>Desconectado</span>';
+  });
+}
 function renderUsuarios(){
   if(currentUser?.role!=='admin'){
     document.getElementById('page-usuarios').innerHTML='<div style="text-align:center;padding:48px;color:var(--gray)">🔒 Solo el administrador puede gestionar usuarios</div>';
     return;
   }
-  // Auto-refresh cada 15 segundos mientras la página está activa
+  // Auto-refresh de presencia cada 15s — SIN re-renderizar el form completo
   clearInterval(window._usuariosRefreshInterval);
   window._usuariosRefreshInterval=setInterval(()=>{
     const pU=document.getElementById('page-usuarios');
-    if(pU&&pU.classList.contains('active')){_sincPresencia();renderUsuarios();}
-    else{clearInterval(window._usuariosRefreshInterval);}
+    if(!pU||!pU.classList.contains('active')){clearInterval(window._usuariosRefreshInterval);return;}
+    _sincPresencia();
+    // Solo actualizar badges de estado en línea, no re-renderizar todo
+    _actualizarBadgesOnlineUsuarios();
   },15000);
   // Asegurar que el usuario actual esté marcado en línea antes de renderizar
   if(currentUser){
@@ -2343,7 +2377,7 @@ function renderUsuarios(){
             <td style="font-weight:600">${escHtml(u.nombre)}</td>
             <td class="mono" style="font-size:12px">${escHtml(u.username)}</td>
             <td><span class="badge ${u.role==='admin'?'badge-purple':'badge-blue'}">${escHtml(rolLabel)}</span></td>
-            <td>${estadoHTML}</td>
+            <td id="user-status-${u.id}">${estadoHTML}</td>
             <td style="max-width:320px">
               <div style="display:flex;flex-wrap:wrap;gap:3px">
                 ${modsLabel.map(m=>`<span class="badge badge-green" style="font-size:10px">${escHtml(m)}</span>`).join('')}
@@ -3449,7 +3483,7 @@ function _iniciarPresenciaGlobal(){
           _escribirPresenciaGlobal(e.data.uid,e.data.ts);
         }
         const pU=document.getElementById('page-usuarios');
-        if(pU&&pU.classList.contains('active')){clearTimeout(window._presenciaRefreshTimer);window._presenciaRefreshTimer=setTimeout(renderUsuarios,400);}
+        if(pU&&pU.classList.contains('active')){clearTimeout(window._presenciaRefreshTimer);window._presenciaRefreshTimer=setTimeout(_actualizarBadgesOnlineUsuarios,400);}
       }
     };
   }catch(e){console.warn('BroadcastChannel no disponible:',e.message);}
@@ -3462,7 +3496,7 @@ function _iniciarPresenciaGlobal(){
     _pingPresencia();
     // Refrescar usuarios y chat si están activos para mostrar estado actualizado
     const pU=document.getElementById('page-usuarios');
-    if(pU&&pU.classList.contains('active')){clearTimeout(window._presenciaRefreshTimer);window._presenciaRefreshTimer=setTimeout(renderUsuarios,200);}
+    if(pU&&pU.classList.contains('active')){clearTimeout(window._presenciaRefreshTimer);window._presenciaRefreshTimer=setTimeout(_actualizarBadgesOnlineUsuarios,200);}
   },8000);
   window.addEventListener('beforeunload',()=>{
     if(currentUser){
@@ -8607,7 +8641,7 @@ function fbActivarListeners(){
           const pU=document.getElementById('page-usuarios');
           if(pU&&pU.classList.contains('active')){
             clearTimeout(window._presenciaRefreshTimer);
-            window._presenciaRefreshTimer=setTimeout(()=>{if(typeof renderUsuarios==='function')renderUsuarios();},300);
+            window._presenciaRefreshTimer=setTimeout(_actualizarBadgesOnlineUsuarios,300);
           }
           return; // No ejecutar el renderMap genérico
         } else if(key==='config_logo'){

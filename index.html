@@ -2281,14 +2281,19 @@ function renderUsuarios(){
     {id:'ventas',label:'Ventas'},{id:'cxc',label:'Cuentas por Cobrar'},
     {id:'suplidores',label:'Suplidores'},{id:'gastos',label:'Gastos Empresa'},
     {id:'nomina',label:'Nómina'},{id:'caja',label:'Caja'},
-    {id:'cotizaciones',label:'Cotizaciones'},{id:'autorizaciones',label:'Autorización Compra'},{id:'seguros',label:'Seguros'},{id:'facturaExterna',label:'Facturas Externas'},{id:'alertas',label:'Alertas'},{id:'verSaldoCaja',label:'💰 Saldo Caja'},{id:'chat',label:'💬 Chat'},
-    {id:'usuarios',label:'Usuarios'},{id:'config',label:'Configuración'},
+    {id:'cotizaciones',label:'Cotizaciones'},{id:'autorizaciones',label:'Autorización Compra'},
+    {id:'seguros',label:'Seguros'},{id:'facturaExterna',label:'Facturas Externas'},
+    {id:'alertas',label:'Alertas'},{id:'verSaldoCaja',label:'💰 Saldo Caja'},
+    {id:'chat',label:'💬 Chat'},{id:'usuarios',label:'Usuarios'},
+    {id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},{id:'config',label:'Configuración'},
   ];
   const BORRAR=[
     {id:'ventas',label:'Borrar Ventas'},{id:'clientes',label:'Borrar Clientes'},
     {id:'suplidores',label:'Borrar Suplidores'},{id:'gastos',label:'Borrar Gastos'},
     {id:'nomina',label:'Borrar Nómina'},{id:'gastosVeh',label:'Borrar Gastos Vehículo'},
     {id:'cxc',label:'Borrar Cobros'},{id:'inventario',label:'Borrar Vehículos'},
+    {id:'cotizaciones',label:'Borrar Cotizaciones'},{id:'cxp',label:'Borrar CxP'},
+    {id:'seguros',label:'Borrar Seguros'},{id:'facturaExterna',label:'Borrar Facturas Externas'},
   ];
   document.getElementById('page-usuarios').innerHTML=`
     <div class="page-header"><div><h1>👥 Usuarios</h1></div></div>
@@ -2407,7 +2412,7 @@ function crearUsuarioNuevo(){
   if(!nombre||!user||!pass){toast('Complete nombre, usuario y contraseña','error');return;}
   if(DB.users.find(u=>u.username===user)){toast('El usuario ya existe','error');return;}
   const MODS_IDS=['dashboard','informes','inventario','gastosVeh','cxp','clientes','ventas','cxc','suplidores','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','usuarios','cuentasBancarias','config'];
-  const DEL_IDS=['ventas','clientes','suplidores','gastos','nomina','gastosVeh','cxc','inventario'];
+  const DEL_IDS=['ventas','clientes','suplidores','gastos','nomina','gastosVeh','cxc','inventario','cotizaciones','cxp','seguros','facturaExterna'];
   const modulos=role==='admin'?MODS_IDS:MODS_IDS.filter(id=>document.getElementById('nu-mod-'+id)?.checked);
   const puedeEliminar=role==='admin'||DEL_IDS.some(id=>document.getElementById('nu-del-'+id)?.checked);
   const puedeEditar=role==='admin'||DEL_IDS.some(id=>document.getElementById('nu-edit-'+id)?.checked);
@@ -2535,11 +2540,11 @@ function editarUsuario(i){
       </div>
       <div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--gray);text-transform:uppercase">✏️ Permisos de Editar por módulo:</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px">
-        ${[{k:'editarVentas',l:'Ventas'},{k:'editarClientes',l:'Clientes'},{k:'editarSuplidores',l:'Suplidores'},{k:'editarGastos',l:'Gastos'},{k:'editarNomina',l:'Nómina'},{k:'editarGastosVeh',l:'Gastos Vehículo'},{k:'editarCobros',l:'Cobros'},{k:'editarVehiculos',l:'Vehículos'}].map(p=>`<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 6px;background:#eff6ff;border-radius:5px;border:1px solid #bfdbfe"><input type="checkbox" id="u-perm-${p.k}" ${(perms[p.k]||u.role==='admin')?'checked':''} style="accent-color:var(--blue)"> ${p.l}</label>`).join('')}
+        ${[{k:'editarVentas',l:'Ventas'},{k:'editarClientes',l:'Clientes'},{k:'editarSuplidores',l:'Suplidores'},{k:'editarGastos',l:'Gastos'},{k:'editarNomina',l:'Nómina'},{k:'editarGastosVeh',l:'Gastos Vehículo'},{k:'editarCobros',l:'Cobros'},{k:'editarVehiculos',l:'Vehículos'},{k:'editarCotizaciones',l:'Cotizaciones'},{k:'editarCxP',l:'CxP'},{k:'editarSeguros',l:'Seguros'},{k:'editarFacturas',l:'Facturas Externas'}].map(p=>`<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 6px;background:#eff6ff;border-radius:5px;border:1px solid #bfdbfe"><input type="checkbox" id="u-perm-${p.k}" ${(perms[p.k]||u.role==='admin')?'checked':''} style="accent-color:var(--blue)"> ${p.l}</label>`).join('')}
       </div>
       <div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--gray);text-transform:uppercase">🗑 Permisos de Borrar por módulo:</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
-        ${[{k:'borrarVentas',l:'Ventas'},{k:'borrarClientes',l:'Clientes'},{k:'borrarSuplidores',l:'Suplidores'},{k:'borrarGastos',l:'Gastos'},{k:'borrarNomina',l:'Nómina'},{k:'borrarGastosVeh',l:'Gastos Vehículo'},{k:'borrarCobros',l:'Cobros'},{k:'borrarVehiculos',l:'Vehículos'}].map(p=>`<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 6px;background:#fff1f2;border-radius:5px;border:1px solid #fecdd3"><input type="checkbox" id="u-perm-${p.k}" ${(perms[p.k]||u.role==='admin')?'checked':''} style="accent-color:var(--red)"> ${p.l}</label>`).join('')}
+        ${[{k:'borrarVentas',l:'Ventas'},{k:'borrarClientes',l:'Clientes'},{k:'borrarSuplidores',l:'Suplidores'},{k:'borrarGastos',l:'Gastos'},{k:'borrarNomina',l:'Nómina'},{k:'borrarGastosVeh',l:'Gastos Vehículo'},{k:'borrarCobros',l:'Cobros'},{k:'borrarVehiculos',l:'Vehículos'},{k:'borrarCotizaciones',l:'Cotizaciones'},{k:'borrarCxP',l:'CxP'},{k:'borrarSeguros',l:'Seguros'},{k:'borrarFacturas',l:'Facturas Externas'}].map(p=>`<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 6px;background:#fff1f2;border-radius:5px;border:1px solid #fecdd3"><input type="checkbox" id="u-perm-${p.k}" ${(perms[p.k]||u.role==='admin')?'checked':''} style="accent-color:var(--red)"> ${p.l}</label>`).join('')}
       </div>
     </div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="guardarUsuario(${i})">💾 Actualizar</button>`);
@@ -2589,25 +2594,47 @@ function guardarUsuario(idx){
   if(idx===undefined&&DB.users.find(u=>u.username===user)){toast('El usuario ya existe','error');return;}
   const MODS_IDS=['dashboard','informes','suplidores','inventario','gastosVeh','cxp','clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','cuentasBancarias'];
   const nuevosMods=MODS_IDS.filter(m=>{const el=document.getElementById('u-mod-'+m);return el&&el.checked;});
-  const permKeys=['editar','eliminar','imprimir','pdf','editarVentas','editarClientes','editarSuplidores','editarGastos','editarNomina','editarGastosVeh','editarCobros','editarVehiculos','borrarVentas','borrarClientes','borrarSuplidores','borrarGastos','borrarNomina','borrarGastosVeh','borrarCobros','borrarVehiculos'];
+  const permKeys=['editar','eliminar','imprimir','pdf','editarVentas','editarClientes','editarSuplidores','editarGastos','editarNomina','editarGastosVeh','editarCobros','editarVehiculos','editarCotizaciones','editarCxP','editarSeguros','editarFacturas','borrarVentas','borrarClientes','borrarSuplidores','borrarGastos','borrarNomina','borrarGastosVeh','borrarCobros','borrarVehiculos','borrarCotizaciones','borrarCxP','borrarSeguros','borrarFacturas'];
   const nuevosPerms={};permKeys.forEach(k=>{const el=document.getElementById('u-perm-'+k);if(el)nuevosPerms[k]=el.checked;});
-  if(idx!==undefined){DB.users[idx].nombre=nombre;DB.users[idx].username=user;DB.users[idx].role=document.getElementById('u-role').value;if(pass)DB.users[idx].password=pass;DB.users[idx].modulos=nuevosMods;DB.users[idx].permisos=nuevosPerms;if(currentUser.id===DB.users[idx].id){currentUser=DB.users[idx];}}
-  else DB.users.push({id:uid(),nombre,username:user,password:pass,role:document.getElementById('u-role').value,activo:true,modulos:nuevosMods,permisos:nuevosPerms});
+  if(idx!==undefined){
+    DB.users[idx].nombre=nombre;
+    DB.users[idx].username=user;
+    DB.users[idx].role=document.getElementById('u-role').value;
+    if(pass)DB.users[idx].password=pass;
+    DB.users[idx].modulos=nuevosMods;
+    DB.users[idx].permisos=nuevosPerms;
+    // Si el usuario editado es el que está logueado → actualizar currentUser en memoria
+    if(currentUser.id===DB.users[idx].id){
+      currentUser=Object.assign({},DB.users[idx]);
+      // Actualizar sidebar inmediatamente
+      aplicarPermisosNav();
+      document.getElementById('top-username').textContent=currentUser.nombre;
+      document.getElementById('top-role').textContent=_getRolLabel(currentUser.role);
+      const initials=(currentUser.nombre||'U').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      const av=document.getElementById('user-initials');if(av)av.textContent=initials;
+    }
+  } else {
+    DB.users.push({id:uid(),nombre,username:user,password:pass,role:document.getElementById('u-role').value,activo:true,modulos:nuevosMods,permisos:nuevosPerms});
+  }
   sDB('users');
   if(typeof fbGuardar==='function'&&window._fbActivo)fbGuardar('users').catch(()=>{});
-  closeModal();toast('Usuario guardado ✓','success');renderUsuarios();
-  // Re-renderizar página activa para que permisos apliquen de inmediato
-  const _ap2=document.querySelector('.page.active');
-  if(_ap2){
-    const _pid2=_ap2.id.replace('page-','');
-    const _rm2={dashboard:renderDashboard,inventario:renderInventario,ventas:renderVentas,
+  closeModal();
+  toast('Permisos guardados ✓','success');
+  renderUsuarios();
+  // Re-renderizar página activa para reflejar permisos al instante
+  setTimeout(()=>{
+    const _ap=document.querySelector('.page.active');
+    if(!_ap)return;
+    const _pid=_ap.id.replace('page-','');
+    const _rm={dashboard:renderDashboard,inventario:renderInventario,ventas:renderVentas,
       clientes:renderClientes,suplidores:renderSuplidores,gastos:renderGastos,
       nomina:renderNomina,cxc:renderCXC,cxp:renderCXP,caja:renderCaja,
       gastosVeh:renderGastosVeh,cotizaciones:renderCotizaciones,
-      autorizaciones:renderAutorizaciones,usuarios:renderUsuarios,
-      informes:renderInformes,config:renderConfig};
-    if(_rm2[_pid2])setTimeout(_rm2[_pid2],150);
-  }
+      autorizaciones:renderAutorizaciones,seguros:renderSeguros,
+      facturaExterna:renderFacturaExterna,alertas:renderAlertas,
+      cuentasBancarias:renderCuentasBancarias,informes:renderInformes,config:renderConfig};
+    if(_rm[_pid])_rm[_pid]();
+  },100);
 }
 
 
@@ -2723,23 +2750,30 @@ function guardarPermisosUsuarioConfig(i){
     DB.users[i].modulos=mods;
     DB.users[i].alertasPermitidas=alertas;
     DB.users[i].permisos={editar:puedeEditar,eliminar:puedeEliminar,imprimir:puedeImprimir};
-    if(currentUser.id===u.id){currentUser=DB.users[i];}
+    if(currentUser.id===u.id){
+      currentUser=Object.assign({},DB.users[i]);
+      aplicarPermisosNav();
+      document.getElementById('top-username').textContent=currentUser.nombre;
+      document.getElementById('top-role').textContent=_getRolLabel(currentUser.role);
+    }
   }
   sDB('users');
   toast(`Usuario ${escHtml(u.nombre)} actualizado ✓`,'success');
   if(typeof fbGuardar==='function'&&window._fbActivo)fbGuardar('users').catch(()=>{});
   // Re-renderizar página activa para reflejar permisos inmediatamente
-  const _ap=document.querySelector('.page.active');
-  if(_ap){
+  setTimeout(()=>{
+    const _ap=document.querySelector('.page.active');
+    if(!_ap)return;
     const _pid=_ap.id.replace('page-','');
     const _rm={dashboard:renderDashboard,inventario:renderInventario,ventas:renderVentas,
       clientes:renderClientes,suplidores:renderSuplidores,gastos:renderGastos,
       nomina:renderNomina,cxc:renderCXC,cxp:renderCXP,caja:renderCaja,
       gastosVeh:renderGastosVeh,cotizaciones:renderCotizaciones,
-      autorizaciones:renderAutorizaciones,usuarios:renderUsuarios,
-      informes:renderInformes,config:renderConfig};
-    if(_rm[_pid])setTimeout(_rm[_pid],100);
-  }
+      autorizaciones:renderAutorizaciones,seguros:renderSeguros,
+      facturaExterna:renderFacturaExterna,alertas:renderAlertas,
+      cuentasBancarias:renderCuentasBancarias,informes:renderInformes,config:renderConfig};
+    if(_rm[_pid])_rm[_pid]();
+  },100);
 }
 
 
@@ -3208,7 +3242,7 @@ function renderConfig(){
       <p style="font-size:13px;color:var(--gray);margin-bottom:12px">El administrador puede editar módulos, permisos y alertas de cada usuario. Los cambios se guardan de inmediato.</p>
       <div style="display:flex;flex-direction:column;gap:12px">
         ${DB.users.map((u,ui)=>{
-          const MODS_LIST=[{id:'dashboard',label:'Inicio'},{id:'informes',label:'Informe'},{id:'suplidores',label:'Suplidores'},{id:'inventario',label:'Reg. Vehículo'},{id:'gastosVeh',label:'Gastos Veh.'},{id:'cxp',label:'CxP'},{id:'clientes',label:'Clientes'},{id:'ventas',label:'Ventas'},{id:'cxc',label:'CxC'},{id:'gastos',label:'Gastos Emp.'},{id:'nomina',label:'Nómina'},{id:'caja',label:'Caja'},{id:'cotizaciones',label:'Cotizaciones'},{id:'autorizaciones',label:'Autorizaciones'},{id:'cuentasBancarias',label:'🏦 C. Bancarias'}];
+          const MODS_LIST=[{id:'dashboard',label:'Inicio'},{id:'informes',label:'Informe'},{id:'suplidores',label:'Suplidores'},{id:'inventario',label:'Reg. Vehículo'},{id:'gastosVeh',label:'Gastos Veh.'},{id:'cxp',label:'CxP'},{id:'clientes',label:'Clientes'},{id:'ventas',label:'Ventas'},{id:'cxc',label:'CxC'},{id:'gastos',label:'Gastos Emp.'},{id:'nomina',label:'Nómina'},{id:'caja',label:'Caja'},{id:'cotizaciones',label:'Cotizaciones'},{id:'autorizaciones',label:'Autorizaciones'},{id:'seguros',label:'Seguros'},{id:'facturaExterna',label:'Facturas Ext.'},{id:'alertas',label:'Alertas'},{id:'chat',label:'Chat'},{id:'cuentasBancarias',label:'🏦 C. Bancarias'}];
           const ALERT_TYPES=[{id:'SIN_VIN',label:'Sin VIN'},{id:'SIN_COSTO',label:'Sin costos'},{id:'CXP',label:'CxP pendientes'},{id:'CXC_VENCIDA',label:'CxC vencidas'},{id:'CXC',label:'CxC pendientes'},{id:'SIN_VENDER_6M',label:'6m sin vender'},{id:'SIN_VENDER_1A',label:'1 año sin vender'},{id:'DOCS',label:'Docs pendientes'}];
           const mods=u.modulos||[];
           const alertas=u.alertasPermitidas||ALERT_TYPES.map(a=>a.id);

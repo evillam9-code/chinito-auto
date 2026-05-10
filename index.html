@@ -301,8 +301,7 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
     <div class="nav-item" onclick="showPage('usuarios')" id="nav-usuarios"><span class="ico">👥</span>Usuarios</div>
     <div class="nav-item" onclick="showPage('alertas')" id="nav-alertas"><span class="ico">🔔</span>Alertas del Sistema</div>
     <div class="nav-item" onclick="showPage('cuentasBancarias')" id="nav-cuentasBancarias"><span class="ico">🏦</span>Cuentas Bancarias</div>
-      <div class="nav-item" onclick="showPage('cuentas')" id="nav-cuentas"><span class="ico">🏦</span>Cuentas</div>
-      <div class="nav-item" onclick="showPage('cumpleanos')" id="nav-cumpleanos"><span class="ico">🎂</span>Cumpleaños</div>
+        <div class="nav-item" onclick="showPage('cumpleanos')" id="nav-cumpleanos"><span class="ico">🎂</span>Cumpleaños</div>
       <div class="nav-item" id="nav-backup-btn" style="display:none;color:var(--green)" onclick="showPage('backup')"><span class="ico">💾</span>Backup</div>
     <div class="nav-item" onclick="showPage('config')" id="nav-config"><span class="ico">⚙️</span>Configuración</div>
     <div style="margin-top:auto;border-top:1px solid var(--gray3)">
@@ -348,7 +347,6 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
       <div class="page" id="page-seguros"></div>
       <div class="page" id="page-facturaExterna"></div>
       <div class="page" id="page-cumpleanos"></div>
-      <div class="page" id="page-cuentas"></div>
       <div class="page" id="page-backup"></div>
     </div>
   </div>
@@ -667,7 +665,7 @@ function aplicarPermisosNav(){
   if(!currentUser)return;
   // Ocultar nav-items de módulos sin acceso
   const MODS_NAV=['dashboard','informes','suplidores','inventario','gastosVeh','cxp',
-    'clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','usuarios','cuentasBancarias','config','cumpleanos','cuentas'];
+    'clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','usuarios','cuentasBancarias','config','cumpleanos'];
   MODS_NAV.forEach(id=>{
     const nav=document.getElementById('nav-'+id);
     if(!nav)return;
@@ -756,7 +754,7 @@ function showPage(id){
   if(id!=='dashboard'&&currentUser?.role!=='admin'&&!canAccess(id)){toast('No tienes acceso a este módulo','error');return;}
   document.getElementById('page-'+id)?.classList.add('active');
   document.getElementById('nav-'+id)?.classList.add('active');
-  const r={dashboard:renderDashboard,inventario:renderInventario,ventas:renderVentas,cotizaciones:renderCotizaciones,clientes:renderClientes,suplidores:renderSuplidores,caja:renderCaja,gastos:renderGastos,nomina:renderNomina,informes:renderInformes,usuarios:renderUsuarios,config:renderConfig,gastosVeh:renderGastosVeh,cxp:renderCXP,cxc:renderCXC,autorizaciones:renderAutorizaciones,seguros:renderSeguros,facturaExterna:renderFacturaExterna,alertas:renderAlertas,chat:renderChat,cuentasBancarias:renderCuentasBancarias,cumpleanos:renderCumpleanos,cuentas:renderCuentas,backup:renderBackup};
+  const r={dashboard:renderDashboard,inventario:renderInventario,ventas:renderVentas,cotizaciones:renderCotizaciones,clientes:renderClientes,suplidores:renderSuplidores,caja:renderCaja,gastos:renderGastos,nomina:renderNomina,informes:renderInformes,usuarios:renderUsuarios,config:renderConfig,gastosVeh:renderGastosVeh,cxp:renderCXP,cxc:renderCXC,autorizaciones:renderAutorizaciones,seguros:renderSeguros,facturaExterna:renderFacturaExterna,alertas:renderAlertas,chat:renderChat,cuentasBancarias:renderCuentasBancarias,cumpleanos:renderCumpleanos,backup:renderBackup};
   if(r[id])r[id]();
 }
 
@@ -2423,7 +2421,7 @@ function renderUsuarios(){
     {id:'alertas',label:'Alertas'},{id:'verSaldoCaja',label:'💰 Saldo Caja'},
     {id:'chat',label:'💬 Chat'},{id:'usuarios',label:'Usuarios'},
     {id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},{id:'config',label:'Configuración'},
-    {id:'cuentas',label:'🏦 Cuentas'},{id:'cumpleanos',label:'🎂 Cumpleaños'},
+    {id:'cumpleanos',label:'🎂 Cumpleaños'},
   ];
   const BORRAR=[
     {id:'ventas',label:'Borrar Ventas'},{id:'clientes',label:'Borrar Clientes'},
@@ -2550,7 +2548,7 @@ function crearUsuarioNuevo(){
   const role=document.getElementById('nu-role')?.value;
   if(!nombre||!user||!pass){toast('Complete nombre, usuario y contraseña','error');return;}
   if(DB.users.find(u=>u.username===user)){toast('El usuario ya existe','error');return;}
-  const MODS_IDS=['dashboard','informes','inventario','gastosVeh','cxp','clientes','ventas','cxc','suplidores','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','usuarios','cuentasBancarias','config','cumpleanos','cuentas'];
+  const MODS_IDS=['dashboard','informes','inventario','gastosVeh','cxp','clientes','ventas','cxc','suplidores','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','usuarios','cuentasBancarias','config','cumpleanos'];
   const DEL_IDS=['ventas','clientes','suplidores','gastos','nomina','gastosVeh','cxc','inventario','cotizaciones','cxp','seguros','facturaExterna'];
   const modulos=role==='admin'?MODS_IDS:MODS_IDS.filter(id=>document.getElementById('nu-mod-'+id)?.checked);
   const puedeEliminar=role==='admin'||DEL_IDS.some(id=>document.getElementById('nu-del-'+id)?.checked);
@@ -2643,7 +2641,7 @@ function editarUsuario(i){
     {id:'nomina',label:'👷 Nómina'},{id:'caja',label:'💳 Caja'},
     {id:'cotizaciones',label:'📋 Cotizaciones'},{id:'autorizaciones',label:'📝 Autorización Compra'},
     {id:'seguros',label:'🛡️ Seguros'},{id:'facturaExterna',label:'🧾 Facturas Externas'},{id:'alertas',label:'🔔 Alertas'},{id:'verSaldoCaja',label:'💰 Ver Saldo Caja'},{id:'chat',label:'💬 Chat Interno'},{id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},
-    {id:'cuentas',label:'🏦 Cuentas'},{id:'cumpleanos',label:'🎂 Cumpleaños'},
+    {id:'cumpleanos',label:'🎂 Cumpleaños'},
   ];
   const mods=u.modulos||[];
   const perms=u.permisos||{};
@@ -2732,7 +2730,7 @@ function guardarUsuario(idx){
   const pass=document.getElementById('u-pass').value;
   if(!nombre||!user||(!pass&&idx===undefined)){toast('Complete todos los campos','error');return;}
   if(idx===undefined&&DB.users.find(u=>u.username===user)){toast('El usuario ya existe','error');return;}
-  const MODS_IDS=['dashboard','informes','suplidores','inventario','gastosVeh','cxp','clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','cuentasBancarias','cuentas','cumpleanos'];
+  const MODS_IDS=['dashboard','informes','suplidores','inventario','gastosVeh','cxp','clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','cuentasBancarias','cumpleanos'];
   const nuevosMods=MODS_IDS.filter(m=>{const el=document.getElementById('u-mod-'+m);return el&&el.checked;});
   const permKeys=['editar','eliminar','imprimir','pdf','editarVentas','editarClientes','editarSuplidores','editarGastos','editarNomina','editarGastosVeh','editarCobros','editarCxP','editarVehiculos','editarCaja','editarCotizaciones','editarAutorizaciones','editarSeguros','editarFacturas','borrarVentas','borrarClientes','borrarSuplidores','borrarGastos','borrarNomina','borrarGastosVeh','borrarCobros','borrarCxP','borrarVehiculos','borrarCaja','borrarCotizaciones','borrarAutorizaciones','borrarSeguros','borrarFacturas'];
   const nuevosPerms={};permKeys.forEach(k=>{const el=document.getElementById('u-perm-'+k);if(el)nuevosPerms[k]=el.checked;});
@@ -3741,7 +3739,7 @@ function renderConfig(){
       <p style="font-size:13px;color:var(--gray);margin-bottom:12px">El administrador puede editar módulos, permisos y alertas de cada usuario. Los cambios se guardan de inmediato.</p>
       <div style="display:flex;flex-direction:column;gap:12px">
         ${DB.users.map((u,ui)=>{
-          const MODS_LIST=[{id:'dashboard',label:'Inicio'},{id:'informes',label:'Informe'},{id:'suplidores',label:'Suplidores'},{id:'inventario',label:'Reg. Vehículo'},{id:'gastosVeh',label:'Gastos Veh.'},{id:'cxp',label:'CxP'},{id:'clientes',label:'Clientes'},{id:'ventas',label:'Ventas'},{id:'cxc',label:'CxC'},{id:'gastos',label:'Gastos Emp.'},{id:'nomina',label:'Nómina'},{id:'caja',label:'Caja'},{id:'cotizaciones',label:'Cotizaciones'},{id:'autorizaciones',label:'Autorizaciones'},{id:'seguros',label:'Seguros'},{id:'facturaExterna',label:'Facturas Ext.'},{id:'alertas',label:'Alertas'},{id:'chat',label:'Chat'},{id:'cuentasBancarias',label:'🏦 C. Bancarias'},{id:'cuentas',label:'🏦 Cuentas'},{id:'cumpleanos',label:'🎂 Cumpleaños'}];
+          const MODS_LIST=[{id:'dashboard',label:'Inicio'},{id:'informes',label:'Informe'},{id:'suplidores',label:'Suplidores'},{id:'inventario',label:'Reg. Vehículo'},{id:'gastosVeh',label:'Gastos Veh.'},{id:'cxp',label:'CxP'},{id:'clientes',label:'Clientes'},{id:'ventas',label:'Ventas'},{id:'cxc',label:'CxC'},{id:'gastos',label:'Gastos Emp.'},{id:'nomina',label:'Nómina'},{id:'caja',label:'Caja'},{id:'cotizaciones',label:'Cotizaciones'},{id:'autorizaciones',label:'Autorizaciones'},{id:'seguros',label:'Seguros'},{id:'facturaExterna',label:'Facturas Ext.'},{id:'alertas',label:'Alertas'},{id:'chat',label:'Chat'},{id:'cuentasBancarias',label:'🏦 C. Bancarias'},{id:'cumpleanos',label:'🎂 Cumpleaños'}];
           const ALERT_TYPES=[{id:'SIN_VIN',label:'Sin VIN'},{id:'SIN_COSTO',label:'Sin costos'},{id:'CXP',label:'CxP pendientes'},{id:'CXC_VENCIDA',label:'CxC vencidas'},{id:'CXC',label:'CxC pendientes'},{id:'SIN_VENDER_6M',label:'6m sin vender'},{id:'SIN_VENDER_1A',label:'1 año sin vender'},{id:'DOCS',label:'Docs pendientes'}];
           const mods=u.modulos||[];
           const alertas=u.alertasPermitidas||ALERT_TYPES.map(a=>a.id);

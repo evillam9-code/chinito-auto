@@ -2423,6 +2423,7 @@ function renderUsuarios(){
     {id:'alertas',label:'Alertas'},{id:'verSaldoCaja',label:'💰 Saldo Caja'},
     {id:'chat',label:'💬 Chat'},{id:'usuarios',label:'Usuarios'},
     {id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},{id:'config',label:'Configuración'},
+    {id:'cuentas',label:'🏦 Cuentas'},{id:'cumpleanos',label:'🎂 Cumpleaños'},
   ];
   const BORRAR=[
     {id:'ventas',label:'Borrar Ventas'},{id:'clientes',label:'Borrar Clientes'},
@@ -2431,6 +2432,7 @@ function renderUsuarios(){
     {id:'cxc',label:'Borrar Cobros'},{id:'inventario',label:'Borrar Vehículos'},
     {id:'cotizaciones',label:'Borrar Cotizaciones'},{id:'cxp',label:'Borrar CxP'},
     {id:'seguros',label:'Borrar Seguros'},{id:'facturaExterna',label:'Borrar Facturas Externas'},
+    {id:'caja',label:'Borrar Caja'},{id:'autorizaciones',label:'Borrar Autorizaciones'},
   ];
   document.getElementById('page-usuarios').innerHTML=`
     <div class="page-header"><div><h1>👥 Usuarios</h1></div></div>
@@ -2641,6 +2643,7 @@ function editarUsuario(i){
     {id:'nomina',label:'👷 Nómina'},{id:'caja',label:'💳 Caja'},
     {id:'cotizaciones',label:'📋 Cotizaciones'},{id:'autorizaciones',label:'📝 Autorización Compra'},
     {id:'seguros',label:'🛡️ Seguros'},{id:'facturaExterna',label:'🧾 Facturas Externas'},{id:'alertas',label:'🔔 Alertas'},{id:'verSaldoCaja',label:'💰 Ver Saldo Caja'},{id:'chat',label:'💬 Chat Interno'},{id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},
+    {id:'cuentas',label:'🏦 Cuentas'},{id:'cumpleanos',label:'🎂 Cumpleaños'},
   ];
   const mods=u.modulos||[];
   const perms=u.permisos||{};

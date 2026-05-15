@@ -383,6 +383,11 @@ const defaultConfig={
   bancos:['Banco Popular','Banco BHD','Banco BanReservas','Banco Santa Cruz','Banco Caribe','Asociación Popular','Otra Entidad']
 };
 const defaultUsers=[{id:'u1',nombre:'Administrador',username:'admin',password:'admin123',role:'admin',activo:true}];
+const defaultSuplidores=[
+  {id:'sup1',nombre:'ABC AUTO SHIPPING',empresa:'ABC AUTO SHIPPING',tipoSuplidor:'importadora',telefono:'',activo:true,montoFactura:0,montoPagado:0,montoPendiente:0,status:'ACTIVO'},
+  {id:'sup2',nombre:'TM autos sales LLC.',empresa:'TM autos sales LLC.',tipoSuplidor:'vehiculo',telefono:'',activo:true,montoFactura:0,montoPagado:0,montoPendiente:0,status:'ACTIVO'},
+  {id:'sup3',nombre:'GRUA',empresa:'GRUA',tipoSuplidor:'vehiculo',telefono:'',activo:true,montoFactura:0,montoPagado:0,montoPendiente:0,status:'ACTIVO'}
+];
 
 const MARCAS=['Acura','Alfa Romeo','Audi','BMW','Buick','Cadillac','Chevrolet','Chrysler','Citroën','Dodge','Ferrari','Fiat','Ford','GMC','Honda','Hyundai','Infiniti','Isuzu','Jeep','Kia','Lamborghini','Land Rover','Lexus','Lincoln','Maserati','Mazda','Mercedes-Benz','Mitsubishi','Nissan','Peugeot','Pontiac','Porsche','Ram','Renault','Saturn','Subaru','Suzuki','Tesla','Toyota','Volkswagen','Volvo','Otro'];
 const COLORES=['Negro','Blanco','Plata','Gris','Rojo','Azul','Verde','Marrón','Beige','Dorado','Naranja','Amarillo','Morado','Vino','Champagne','Celeste','Otro'];
@@ -395,7 +400,7 @@ let DB={
   users:ls('users')||defaultUsers,
   vehiculos:ls('vehiculos')||[],
   clientes:ls('clientes')||[],
-  suplidores:ls('suplidores')||[],
+  suplidores:ls('suplidores')||defaultSuplidores,
   ventas:ls('ventas')||[],
   cotizaciones:ls('cotizaciones')||[],
   caja:ls('caja')||[],
@@ -1085,13 +1090,56 @@ function agregarPropietarioRapido(){
   if(sel){const opt=document.createElement('option');opt.value=n;opt.textContent=n;opt.selected=true;sel.appendChild(opt);}
   toast('Propietario "'+n+'" agregado ✓','success');
 }
-function previewFoto(inputId,prevId){
+function previewFoto(inputId,prevId,maxKB){
   const file=document.getElementById(inputId)?.files[0];
   const prev=document.getElementById(prevId);
   if(!file||!prev)return;
-  const reader=new FileReader();
-  reader.onload=e=>{prev.src=e.target.result;prev.style.display='block';};
-  reader.readAsDataURL(file);
+  // Validar tipo
+  const allowed=['image/jpeg','image/jpg','image/png','application/pdf'];
+  if(!allowed.includes(file.type)){toast('Solo se permiten PDF, JPG o PNG','error');return;}
+  // Validar tamaño máx 2MB
+  if(file.size>2*1024*1024){toast('El archivo supera 2MB. Por favor reduce el tamaño','error');return;}
+  if(file.type==='application/pdf'){
+    // PDF — mostrar ícono en lugar de imagen
+    prev.style.display='none';
+    const wrap=prev.parentElement;
+    let pdfPrev=wrap.querySelector('.pdf-preview-tag');
+    if(!pdfPrev){pdfPrev=document.createElement('div');pdfPrev.className='pdf-preview-tag';pdfPrev.style.cssText='display:flex;align-items:center;gap:8px;padding:8px;background:#f1f5f9;border-radius:6px;margin-top:4px;font-size:12px';wrap.appendChild(pdfPrev);}
+    pdfPrev.innerHTML=`<span style="font-size:20px">📄</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(file.name)}</span>`;
+    // Guardar base64 en el img src para compatibilidad
+    const reader=new FileReader();
+    reader.onload=e=>{prev.src=e.target.result;};
+    reader.readAsDataURL(file);
+  } else {
+    // Imagen — comprimir si es necesario
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement('canvas');
+        let w=img.width,h=img.height;
+        const MAX=800;
+        if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        const compressed=canvas.toDataURL('image/jpeg',0.75);
+        prev.src=compressed;prev.style.display='block';
+        // Quitar pdf tag si existía
+        const pdfTag=prev.parentElement?.querySelector('.pdf-preview-tag');
+        if(pdfTag)pdfTag.remove();
+      };
+      img.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+function quitarArchivo(inputId,prevId){
+  const inp=document.getElementById(inputId);
+  const prev=document.getElementById(prevId);
+  if(inp)inp.value='';
+  if(prev){prev.src='';prev.style.display='none';}
+  const wrap=prev?.parentElement;
+  if(wrap){const pt=wrap.querySelector('.pdf-preview-tag');if(pt)pt.remove();}
 }
 
 let invSelectedId=null;
@@ -1234,12 +1282,18 @@ function formVehiculo(v){
     </div>
     <div class="form-row c2">
       <div class="form-field"><label>📋 BL (Bill of Lading)</label>
-        <input type="file" id="v-foto" accept="image/*,application/pdf" onchange="previewFoto('v-foto','v-foto-prev')">
-        <img id="v-foto-prev" src="${v?.foto||''}" style="display:${v?.foto?'block':'none'};width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-top:6px">
+        <input type="file" id="v-foto" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('v-foto','v-foto-prev')">
+        <div style="font-size:10px;color:var(--gray);margin-top:2px">PDF, JPG o PNG — máx 2MB</div>
+        <img id="v-foto-prev" src="${v?.foto||''}" style="display:${v?.foto&&!v.foto.includes('application')?'block':'none'};width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-top:6px">
+        ${v?.foto?`<div class="pdf-preview-tag" style="${v.foto.startsWith('data:application')?'display:flex':'display:none'};align-items:center;gap:8px;padding:8px;background:#f1f5f9;border-radius:6px;margin-top:4px;font-size:12px"><span style="font-size:20px">📄</span><span>Archivo adjunto</span></div>`:''}
+        ${v?.foto?`<button type="button" class="btn btn-red btn-sm" style="margin-top:4px" onclick="quitarArchivo('v-foto','v-foto-prev')">🗑 Quitar</button>`:''}
       </div>
       <div class="form-field"><label>📄 Carfax</label>
-        <input type="file" id="v-carfax" accept="image/*,application/pdf" onchange="previewFoto('v-carfax','v-carfax-prev')">
-        <img id="v-carfax-prev" src="${v?.carfax||''}" style="display:${v?.carfax?'block':'none'};width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-top:6px">
+        <input type="file" id="v-carfax" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('v-carfax','v-carfax-prev')">
+        <div style="font-size:10px;color:var(--gray);margin-top:2px">PDF, JPG o PNG — máx 2MB</div>
+        <img id="v-carfax-prev" src="${v?.carfax||''}" style="display:${v?.carfax&&!v.carfax.includes('application')?'block':'none'};width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-top:6px">
+        ${v?.carfax?`<div class="pdf-preview-tag" style="${v.carfax.startsWith('data:application')?'display:flex':'display:none'};align-items:center;gap:8px;padding:8px;background:#f1f5f9;border-radius:6px;margin-top:4px;font-size:12px"><span style="font-size:20px">📄</span><span>Archivo adjunto</span></div>`:''}
+        ${v?.carfax?`<button type="button" class="btn btn-red btn-sm" style="margin-top:4px" onclick="quitarArchivo('v-carfax','v-carfax-prev')">🗑 Quitar</button>`:''}
       </div>
     </div>
     <div class="form-row c2">
@@ -2050,7 +2104,13 @@ let nomSelectedId=null,nomPagoSelectedId=null;
 function renderNomina(){
   const tab=document.getElementById('nom-tab')?.value||'empleados';
   const mesFiltro=document.getElementById('nom-mes')?.value||'';
-  const total=DB.nomina.filter(e=>e.activo).reduce((a,e)=>a+parseFloat(e.salario||0),0);
+  const total=DB.nomina.filter(e=>e.activo).reduce((a,e)=>{
+    const sal=parseFloat(e.salario||0);
+    const fp=(e.formaPago||'Mensual').toLowerCase();
+    if(fp==='semanal') return a+(sal*4);
+    if(fp==='quincenal') return a+(sal*2);
+    return a+sal;
+  },0);
   const ds='background:#e2e8f0;color:#adb5bd;cursor:not-allowed;border:1px solid #dee2e6';
   const pagos=(DB.nominaPagos||[]);
   const pagosFilt=mesFiltro?pagos.filter(p=>p.mes===mesFiltro):pagos;
@@ -2739,8 +2799,8 @@ function nuevoEmpleado(){
     <div class="form-row c3"><div class="form-field"><label>Documento (Cédula)</label><input type="text" id="e-doc" maxlength="13" placeholder="000-0000000-0" oninput="fmtCedulaInput(this)"></div><div class="form-field"><label>Teléfono</label><input type="text" id="e-tel" maxlength="12" placeholder="000-000-0000" oninput="fmtTelInput(this)"></div><div class="form-field"><label>Fecha Ingreso</label><input type="date" id="e-ingreso" value="${today()}"></div></div>
     <div class="form-row c3"><div class="form-field"><label>Forma de Pago</label><select id="e-pago"><option>Mensual</option><option>Quincenal</option><option>Semanal</option></select></div><div class="form-field"><label class="required">Salario Base</label><input type="text" id="e-salario" placeholder="0.00" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div><div class="form-field"><label>Estado</label><select id="e-activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div></div>
     <div class="form-row c2">
-      <div class="form-field"><label>📷 Doc. Frente</label><input type="file" id="e-doc-f" accept="image/*" onchange="previewFoto('e-doc-f','e-doc-f-prev')"><img id="e-doc-f-prev" style="display:none;width:100%;max-height:80px;object-fit:cover;border-radius:4px;margin-top:4px"></div>
-      <div class="form-field"><label>📷 Doc. Dorso</label><input type="file" id="e-doc-d" accept="image/*" onchange="previewFoto('e-doc-d','e-doc-d-prev')"><img id="e-doc-d-prev" style="display:none;width:100%;max-height:80px;object-fit:cover;border-radius:4px;margin-top:4px"></div>
+      <div class="form-field"><label>📷 Doc. Frente</label><input type="file" id="e-doc-f" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('e-doc-f','e-doc-f-prev')"><div style="font-size:10px;color:var(--gray);margin-top:2px">PDF, JPG o PNG — máx 2MB</div><img id="e-doc-f-prev" style="display:none;width:100%;max-height:80px;object-fit:cover;border-radius:4px;margin-top:4px"></div>
+      <div class="form-field"><label>📷 Doc. Dorso</label><input type="file" id="e-doc-d" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('e-doc-d','e-doc-d-prev')"><div style="font-size:10px;color:var(--gray);margin-top:2px">PDF, JPG o PNG — máx 2MB</div><img id="e-doc-d-prev" style="display:none;width:100%;max-height:80px;object-fit:cover;border-radius:4px;margin-top:4px"></div>
     </div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="guardarEmpleado()">💾 Guardar</button>`);
 }
@@ -2763,8 +2823,8 @@ function editarEmpleado(i){
     <div class="form-row c3"><div class="form-field"><label>Documento (Cédula)</label><input type="text" id="e-doc" maxlength="13" placeholder="000-0000000-0" value="${escHtml(e.documento||'')}" oninput="fmtCedulaInput(this)"></div><div class="form-field"><label>Teléfono</label><input type="text" id="e-tel" maxlength="12" placeholder="000-000-0000" value="${escHtml(e.telefono||'')}" oninput="fmtTelInput(this)"></div><div class="form-field"><label>Fecha Ingreso</label><input type="date" id="e-ingreso" value="${e.fechaIngreso||today()}"></div></div>
     <div class="form-row c3"><div class="form-field"><label>Forma de Pago</label><select id="e-pago">${['Mensual','Quincenal','Semanal'].map(p=>`<option ${p===e.formaPago?'selected':''}>${p}</option>`).join('')}</select></div><div class="form-field"><label class="required">Salario Base</label><input type="text" id="e-salario" value="${fmtMoneyDisplay(e.salario||0)}" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div><div class="form-field"><label>Estado</label><select id="e-activo"><option value="true" ${e.activo!==false?'selected':''}>Activo</option><option value="false" ${e.activo===false?'selected':''}>Inactivo</option></select></div></div>
     <div class="form-row c2">
-      <div class="form-field"><label>📷 Doc. Frente</label><input type="file" id="e-doc-f" accept="image/*" onchange="previewFoto('e-doc-f','e-doc-f-prev')">${docFrenteHtml}</div>
-      <div class="form-field"><label>📷 Doc. Dorso</label><input type="file" id="e-doc-d" accept="image/*" onchange="previewFoto('e-doc-d','e-doc-d-prev')">${docDorsoHtml}</div>
+      <div class="form-field"><label>📷 Doc. Frente</label><input type="file" id="e-doc-f" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('e-doc-f','e-doc-f-prev')"><div style="font-size:10px;color:var(--gray);margin-top:2px">PDF, JPG o PNG — máx 2MB</div>${docFrenteHtml}${e.docFrente?`<button type="button" class="btn btn-red btn-sm" style="margin-top:4px" onclick="quitarArchivo('e-doc-f','e-doc-f-prev')">🗑 Quitar</button>`:''}</div>
+      <div class="form-field"><label>📷 Doc. Dorso</label><input type="file" id="e-doc-d" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('e-doc-d','e-doc-d-prev')"><div style="font-size:10px;color:var(--gray);margin-top:2px">PDF, JPG o PNG — máx 2MB</div>${docDorsoHtml}${e.docDorso?`<button type="button" class="btn btn-red btn-sm" style="margin-top:4px" onclick="quitarArchivo('e-doc-d','e-doc-d-prev')">🗑 Quitar</button>`:''}</div>
     </div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="guardarEmpleado(${i})">💾 Actualizar</button>`);
 }
@@ -4549,10 +4609,7 @@ function toggleGVehMoneda(){
   const wrap=document.getElementById('ngv-tasa-wrap');
   if(wrap) wrap.style.display=moneda==='USD'?'':'none';
   const tasaEl=document.getElementById('ngv-tasa');
-  if(tasaEl&&moneda==='USD'&&!tasaEl.value){
-    const tasaConf=parseFloat(DB.config.tasaCambio||0);
-    if(tasaConf>0) tasaEl.value=tasaConf;
-  }
+  if(tasaEl&&moneda==='USD') tasaEl.value='';
 }
 function actualizarCuentasNGV(){
   const bancoEl=document.getElementById('ngv-banco');
@@ -5483,7 +5540,7 @@ function nuevaVenta(){
         <div class="form-row c2" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Monto Recibido</label><input type="text" id="sv-rec-monto" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
-            <input type="file" id="sv-rec-matricula" accept="image/*" onchange="previewFoto('sv-rec-matricula','sv-rec-mat-prev')">
+            <input type="file" id="sv-rec-matricula" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('sv-rec-matricula','sv-rec-mat-prev')">
             <img id="sv-rec-mat-prev" style="display:none;width:100%;max-height:60px;object-fit:cover;border-radius:4px;margin-top:4px">
           </div>
         </div>
@@ -5557,7 +5614,7 @@ function registrarEntrega(ventaId){
     </div>
     <div class="form-field">
       <label>📷 Foto de Placa / Matrícula (adjuntar)</label>
-      <input type="file" id="ent-foto" accept="image/*" onchange="previewFoto('ent-foto','ent-foto-prev')">
+      <input type="file" id="ent-foto" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('ent-foto','ent-foto-prev')">
       <img id="ent-foto-prev" style="display:none;width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-top:8px;border:2px solid var(--green)">
     </div>
     <div class="form-field">
@@ -6530,11 +6587,13 @@ function formCliente(c){return`
   </div>
   <div class="form-row c2">
     <div class="form-field"><label>📷 Documento Frente</label>
-      <input type="file" id="c-doc-frente" accept="image/*" onchange="previewFoto('c-doc-frente','c-doc-frente-prev')">
+      <input type="file" id="c-doc-frente" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('c-doc-frente','c-doc-frente-prev')">
+        <div style="font-size:10px;color:var(--gray);margin-top:2px">PDF, JPG o PNG — máx 2MB</div>
       <img id="c-doc-frente-prev" src="${c?.docFrente||''}" style="display:${c?.docFrente?'block':'none'};width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-top:6px">
     </div>
     <div class="form-field"><label>📷 Documento Dorso</label>
-      <input type="file" id="c-doc-dorso" accept="image/*" onchange="previewFoto('c-doc-dorso','c-doc-dorso-prev')">
+      <input type="file" id="c-doc-dorso" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('c-doc-dorso','c-doc-dorso-prev')">
+        <div style="font-size:10px;color:var(--gray);margin-top:2px">PDF, JPG o PNG — máx 2MB</div>
       <img id="c-doc-dorso-prev" src="${c?.docDorso||''}" style="display:${c?.docDorso?'block':'none'};width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-top:6px">
     </div>
   </div>`;}
@@ -9397,19 +9456,25 @@ window.addEventListener('load', ()=>{
   if(typeof fbCargar==='function'){
     const btn=document.querySelector('.btn-login');
     if(btn){btn.textContent='Conectando...';btn.disabled=true;}
+    // Timeout de seguridad — si Firebase tarda más de 8s, habilitar botón igual
+    const safetyTimeout=setTimeout(()=>{
+      if(btn&&btn.disabled){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
+    },8000);
     fbCargar().then(async()=>{
+      clearTimeout(safetyTimeout);
       window._fbActivo=true;
       window._fbCargado=true;
       if(typeof fbActivarListeners==='function') fbActivarListeners();
       // Verificar versión antes de mostrar login
       try{
-        const snap=await window._fbDB.collection(window._fbCol).doc('system_version').get();
-        if(snap.exists){
-          const remoteVersion=snap.data().version;
-          if(remoteVersion&&remoteVersion!==APP_VERSION){
-            // Hay versión nueva — recargar antes de que el usuario haga nada
-            window.location.reload(true);
-            return;
+        if(window._fbDB&&window._fbCol){
+          const snap=await window._fbDB.collection(window._fbCol).doc('system_version').get();
+          if(snap.exists){
+            const remoteVersion=snap.data().version;
+            if(remoteVersion&&remoteVersion!==APP_VERSION){
+              window.location.reload(true);
+              return;
+            }
           }
         }
       }catch(e){console.warn('Version check error:',e.message);}
@@ -9418,9 +9483,9 @@ window.addEventListener('load', ()=>{
       const _txt=document.getElementById('fb-text');
       if(_dot)_dot.style.background='#22c55e';
       if(_txt)_txt.textContent='✓ Firebase';
-      // Iniciar verificador continuo cada 30s
       if(typeof iniciarVerificadorVersion==='function') iniciarVerificadorVersion();
     }).catch(()=>{
+      clearTimeout(safetyTimeout);
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
     });
   }
@@ -9441,6 +9506,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const _fbDB = firebase.firestore();
 const _fbCol = 'chinito';
+window._fbDB = _fbDB;
+window._fbCol = _fbCol;
 
 // ══ BACKUP AUTOMÁTICO DIARIO ══
 function _hacerBackup(){
@@ -9669,8 +9736,6 @@ function _mostrarErrorFirebase(){
 }
 
 // ══ SISTEMA DE VERSIONES — actualizar este número cada vez que subes a GitHub ══
-window._fbDB=_fbDB;
-window._fbCol=_fbCol;
 const APP_VERSION = '20260515-01';
 
 async function verificarVersionFirebase(){

@@ -9648,10 +9648,18 @@ async function fbCargar(){
       if(snap.exists){
         const val=JSON.parse(snap.data().valor);
         if(val!==null){
-          if(key==='users'&&Array.isArray(val)&&Array.isArray(DB[key])){
+          if(key==='users'&&Array.isArray(val)){
+            // Firebase es la fuente de verdad — sus datos siempre ganan
+            // Solo agregamos usuarios locales que NO existan en Firebase (ej: creados offline)
             const merged=[...val];
-            DB[key].forEach(lu=>{if(!merged.find(u=>u.id===lu.id))merged.push(lu);});
+            (DB[key]||[]).forEach(lu=>{
+              const enFirebase=merged.find(u=>u.id===lu.id);
+              if(!enFirebase) merged.push(lu); // solo agregar si no existe en Firebase
+              // Si existe en Firebase, Firebase gana — no sobreescribir
+            });
             DB[key]=merged.length>0?merged:DB[key];
+            // Actualizar localStorage para que quede en sync con Firebase
+            try{localStorage.setItem('ds_users',JSON.stringify(DB[key]));}catch{}
           } else if(key==='config_logo'){
             const logoVal=typeof val==='string'?val:(val&&val.logoData?val.logoData:'');
             if(logoVal&&logoVal.startsWith('data:')){
@@ -9767,12 +9775,15 @@ function fbActivarListeners(){
         if(val===null)return;
         // Aplicar según el tipo de key
         if(key==='users'&&Array.isArray(val)){
-          // Merge para no perder usuario local
+          // Firebase es la fuente de verdad — sus datos siempre ganan
           const merged=[...val];
           (DB.users||[]).forEach(lu=>{
             if(!merged.find(u=>u.id===lu.id))merged.push(lu);
+            // Si el usuario YA existe en Firebase, Firebase gana — no mezclar datos viejos
           });
           DB.users=merged.length>0?merged:DB.users;
+          // Actualizar localStorage para mantener sync
+          try{localStorage.setItem('ds_users',JSON.stringify(DB.users));}catch{}
           // Fix 3 — detectar cambios de permisos/módulos del usuario activo en tiempo real
           if(window.currentUser){
             const updatedMe=DB.users.find(u=>u.id===window.currentUser.id);

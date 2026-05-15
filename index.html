@@ -411,7 +411,12 @@ let DB={
   chat:ls('chat')||{},
   presencia:ls('presencia')||{}
 };
-function sDB(k){ss(k,DB[k]);}
+function sDB(k){
+  ss(k,DB[k]);
+  if(window._fbActivo&&typeof fbGuardar==='function'){
+    fbGuardar(k).catch(()=>{});
+  }
+}
 
 const fmt=n=>(DB.config.moneda||'RD$')+' '+parseFloat(n||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtUSD=n=>'USD '+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -9566,7 +9571,7 @@ async function fbGuardar(key){
 
 async function fbCargar(){
   const keys=['config','config_logo','users','vehiculos','clientes','suplidores','ventas','cotizaciones',
-    'caja','gastos','nomina','nominaPagos','gastosVehiculos','cxp','cxc','autorizaciones','seguros','facturasExternas','log'];
+    'caja','gastos','nomina','nominaPagos','gastosVehiculos','cxp','cxc','autorizaciones','seguros','facturasExternas','log','chat'];
   let loaded=false;
   // Fix 4A — carga en paralelo con Promise.allSettled (si una falla las demás siguen)
   const resultados=await Promise.allSettled(
@@ -9698,7 +9703,7 @@ function iniciarVerificadorVersion(){
 function fbActivarListeners(){
   const keys=['config','config_logo','users','vehiculos','clientes','suplidores',
     'ventas','cotizaciones','caja','gastos','nomina','nominaPagos',
-    'gastosVehiculos','cxp','cxc','autorizaciones','presencia'];
+    'gastosVehiculos','cxp','cxc','autorizaciones','presencia','chat'];
   
   keys.forEach(key=>{
     _fbDB.collection(_fbCol).doc(key).onSnapshot(snap=>{
@@ -9804,7 +9809,20 @@ function fbActivarListeners(){
           autorizaciones:['autorizaciones'],
           usuarios:['users','presencia'],config:[],
           informes:['ventas','gastos','cxc','gastosVehiculos','nomina'],
+          chat:['chat'],
         };
+        // Chat: actualizar mensajes en tiempo real sin re-renderizar todo
+        if(key==='chat'){
+          _chatActualizarBadge();
+          if(pid==='chat'){
+            const msgsDiv=document.getElementById('chat-messages');
+            if(msgsDiv&&typeof _renderMensajes==='function'){
+              msgsDiv.innerHTML=_renderMensajes();
+              if(typeof _chatScrollBottom==='function')_chatScrollBottom();
+            }
+          }
+          return;
+        }
         const afecta=keysParaPagina[pid]||[];
         if(afecta.includes(key)&&renderMap[pid]){
           // Pequeño delay para evitar re-renders en cascada

@@ -9451,12 +9451,10 @@ document.addEventListener('DOMContentLoaded',()=>{
 // INIT
 document.getElementById('li-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('li-user').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('li-pass').focus();});
-// Precargar Firebase al arrancar para que los usuarios estén disponibles antes del login
-window.addEventListener('load', ()=>{
+function _iniciarConFirebase(){
   if(typeof fbCargar==='function'){
     const btn=document.querySelector('.btn-login');
     if(btn){btn.textContent='Conectando...';btn.disabled=true;}
-    // Timeout de seguridad — si Firebase tarda más de 8s, habilitar botón igual
     const safetyTimeout=setTimeout(()=>{
       if(btn&&btn.disabled){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
     },8000);
@@ -9465,7 +9463,6 @@ window.addEventListener('load', ()=>{
       window._fbActivo=true;
       window._fbCargado=true;
       if(typeof fbActivarListeners==='function') fbActivarListeners();
-      // Verificar versión antes de mostrar login
       try{
         if(window._fbDB&&window._fbCol){
           const snap=await window._fbDB.collection(window._fbCol).doc('system_version').get();
@@ -9489,7 +9486,7 @@ window.addEventListener('load', ()=>{
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
     });
   }
-});
+}
 </script>
 <!-- ══ FIREBASE ══ -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -9987,6 +9984,8 @@ window.fbIniciar = async function(){
     console.warn('Firebase error:', e.message);
   }
 };
+// Arrancar — todo está definido aquí
+_iniciarConFirebase();
 </script>
 </body>
 </html>

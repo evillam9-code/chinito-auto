@@ -9475,18 +9475,6 @@ function _iniciarConFirebase(){
       window._fbActivo=true;
       window._fbCargado=true;
       if(typeof fbActivarListeners==='function') fbActivarListeners();
-      try{
-        if(window._fbDB&&window._fbCol){
-          const snap=await window._fbDB.collection(window._fbCol).doc('system_version').get();
-          if(snap.exists){
-            const remoteVersion=snap.data().version;
-            if(remoteVersion&&remoteVersion!==APP_VERSION){
-              window.location.reload(true);
-              return;
-            }
-          }
-        }
-      }catch(e){console.warn('Version check error:',e.message);}
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
       const _dot=document.getElementById('fb-dot');
       const _txt=document.getElementById('fb-text');
@@ -9752,11 +9740,7 @@ async function verificarVersionFirebase(){
   try{
     const snap=await window._fbDB.collection(window._fbCol).doc('system_version').get();
     if(!snap.exists) return;
-    const remoteVersion=snap.data().version;
-    if(remoteVersion&&remoteVersion!==APP_VERSION){
-      // Hay versión nueva — recargar silenciosamente
-      window.location.reload(true);
-    }
+    // Version check deshabilitado — no recargar
   }catch(e){console.warn('Version check error:',e.message);}
 }
 
@@ -9767,11 +9751,7 @@ async function publicarVersionActual(){
 }
 
 function iniciarVerificadorVersion(){
-  if(window._versionCheckInterval) clearInterval(window._versionCheckInterval);
-  // Verificar de inmediato al arrancar
-  verificarVersionFirebase();
-  // Luego cada 30 segundos
-  window._versionCheckInterval=setInterval(verificarVersionFirebase,30000);
+  // Verificador deshabilitado para evitar reloads automáticos
 }
 
 function fbActivarListeners(){

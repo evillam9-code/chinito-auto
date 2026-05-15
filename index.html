@@ -208,13 +208,7 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 <script>
 (function(){
   var VERSION='dealer_v14';
-  var saved=localStorage.getItem('ds_version');
-  if(saved&&saved!==VERSION){
-    localStorage.setItem('ds_version',VERSION);
-    location.reload(true);
-  } else if(!saved){
-    localStorage.setItem('ds_version',VERSION);
-  }
+  localStorage.setItem('ds_version',VERSION);
 })();
 </script>
 </head>

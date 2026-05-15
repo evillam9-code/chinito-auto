@@ -208,6 +208,21 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 <script>
 (function(){
   var VERSION='dealer_v14';
+  var APP_BUILD='20260515-01';
+  var storedBuild=localStorage.getItem('ds_build');
+  if(storedBuild && storedBuild!==APP_BUILD){
+    // Version nueva — limpiar localStorage viejo y recargar forzado
+    var savedUsers=localStorage.getItem('ds_users');
+    var savedConfig=localStorage.getItem('ds_config');
+    localStorage.clear();
+    if(savedUsers)localStorage.setItem('ds_users',savedUsers);
+    if(savedConfig)localStorage.setItem('ds_config',savedConfig);
+    localStorage.setItem('ds_build',APP_BUILD);
+    localStorage.setItem('ds_version',VERSION);
+    window.location.reload(true);
+    return;
+  }
+  localStorage.setItem('ds_build',APP_BUILD);
   localStorage.setItem('ds_version',VERSION);
 })();
 </script>
@@ -9658,7 +9673,7 @@ async function fbCargar(){
               // Si existe en Firebase, Firebase gana — no sobreescribir
             });
             DB[key]=merged.length>0?merged:DB[key];
-            // Actualizar localStorage para que quede en sync con Firebase
+            // Sobrescribir localStorage con la versión de Firebase (elimina datos viejos de Edge)
             try{localStorage.setItem('ds_users',JSON.stringify(DB[key]));}catch{}
           } else if(key==='config_logo'){
             const logoVal=typeof val==='string'?val:(val&&val.logoData?val.logoData:'');
@@ -9674,6 +9689,10 @@ async function fbCargar(){
             DB[key]=merged;
           } else {
             DB[key]=val;
+          }
+          // Sincronizar localStorage con Firebase para que Edge no use datos viejos
+          if(key!=='config_logo'){
+            try{localStorage.setItem('ds_'+key,JSON.stringify(DB[key]));}catch{}
           }
           loaded=true;
         }

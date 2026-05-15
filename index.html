@@ -9454,9 +9454,8 @@ document.getElementById('li-user').addEventListener('keydown',e=>{if(e.key==='En
 function _iniciarConFirebase(){
   if(typeof fbCargar==='function'){
     const btn=document.querySelector('.btn-login');
-    if(btn){btn.textContent='Conectando...';btn.disabled=true;}
     const safetyTimeout=setTimeout(()=>{
-      if(btn&&btn.disabled){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
+      if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
     },8000);
     fbCargar().then(async()=>{
       clearTimeout(safetyTimeout);

@@ -614,11 +614,11 @@ function doLogin(){
     _iniciarPresenciaGlobal();
     setTimeout(_verificarBackupAdmin,2500);
     setTimeout(_verificarCumpleanosHoy,3500);
-    // Fix 2 — si es admin, publicar nueva versión al entrar (marca el código actual)
+    // Sistema de versiones — admin publica la versión actual del código
     if(currentUser?.role==='admin'){
       setTimeout(async function(){
-        if(typeof publicarNuevaVersion==='function'&&window._fbActivo){
-          await publicarNuevaVersion(true);
+        if(typeof publicarVersionActual==='function'&&window._fbActivo){
+          await publicarVersionActual();
         }
       },3000);
     }
@@ -3542,6 +3542,7 @@ function renderConfig(){
   document.getElementById('page-config').innerHTML=`
     <div class="page-header"><div><h1>⚙️ Configuración</h1><p>Información del negocio</p></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${currentUser?.role==='admin'?`<span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:20px;font-weight:600">v${typeof APP_VERSION!=='undefined'?APP_VERSION:'—'}</span>`:''}
         <button class="btn btn-secondary btn-sm" onclick="forzarSincronizacion()" style="background:#2563eb;color:#fff;border:none">
           ☁️ Subir todo a Firebase
         </button>
@@ -9389,19 +9390,31 @@ document.getElementById('li-user').addEventListener('keydown',e=>{if(e.key==='En
 // Precargar Firebase al arrancar para que los usuarios estén disponibles antes del login
 window.addEventListener('load', ()=>{
   if(typeof fbCargar==='function'){
-    // Mostrar indicador de carga en el login
     const btn=document.querySelector('.btn-login');
     if(btn){btn.textContent='Conectando...';btn.disabled=true;}
-    fbCargar().then(()=>{
+    fbCargar().then(async()=>{
       window._fbActivo=true;
       window._fbCargado=true;
       if(typeof fbActivarListeners==='function') fbActivarListeners();
+      // Verificar versión antes de mostrar login
+      try{
+        const snap=await window._fbDB.collection(window._fbCol).doc('system_version').get();
+        if(snap.exists){
+          const remoteVersion=snap.data().version;
+          if(remoteVersion&&remoteVersion!==APP_VERSION){
+            // Hay versión nueva — recargar antes de que el usuario haga nada
+            window.location.reload(true);
+            return;
+          }
+        }
+      }catch(e){console.warn('Version check error:',e.message);}
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
-      // Actualizar indicador Firebase
       const _dot=document.getElementById('fb-dot');
       const _txt=document.getElementById('fb-text');
       if(_dot)_dot.style.background='#22c55e';
       if(_txt)_txt.textContent='✓ Firebase';
+      // Iniciar verificador continuo cada 30s
+      if(typeof iniciarVerificadorVersion==='function') iniciarVerificadorVersion();
     }).catch(()=>{
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
     });
@@ -9626,7 +9639,12 @@ window.sDB = function(key){
   });
 };
 
+// Bloquear modal de error Firebase durante arranque inicial
+window._fbArranque=true;
+setTimeout(()=>{ window._fbArranque=false; }, 5000);
+
 function _mostrarErrorFirebase(){
+  if(window._fbArranque) return; // Durante arranque no mostrar error
   if(window._fbErrorVisible)return;
   window._fbErrorVisible=true;
   const ov=document.createElement('div');
@@ -9645,35 +9663,36 @@ function _mostrarErrorFirebase(){
   document.body.appendChild(ov);
 }
 
-// ══ FIX 2 — SISTEMA DE VERSIONES AUTOMÁTICO ══
+// ══ SISTEMA DE VERSIONES — actualizar este número cada vez que subes a GitHub ══
 window._fbDB=_fbDB;
 window._fbCol=_fbCol;
+const APP_VERSION = '20260515-01';
 
-async function publicarNuevaVersion(silencioso){
+async function verificarVersionFirebase(){
+  if(!window._fbActivo||!window._fbDB||!window._fbCol) return;
   try{
-    const newVersion='app_v'+Date.now();
-    await window._fbDB.collection(window._fbCol).doc('system_version').set({version:newVersion});
-    localStorage.setItem('app_version',newVersion);
-    if(!silencioso) console.log('✅ Nueva versión publicada:',newVersion);
+    const snap=await window._fbDB.collection(window._fbCol).doc('system_version').get();
+    if(!snap.exists) return;
+    const remoteVersion=snap.data().version;
+    if(remoteVersion&&remoteVersion!==APP_VERSION){
+      // Hay versión nueva — recargar silenciosamente
+      window.location.reload(true);
+    }
+  }catch(e){console.warn('Version check error:',e.message);}
+}
+
+async function publicarVersionActual(){
+  try{
+    await window._fbDB.collection(window._fbCol).doc('system_version').set({version:APP_VERSION});
   }catch(e){console.warn('Error publicando versión:',e.message);}
 }
 
 function iniciarVerificadorVersion(){
   if(window._versionCheckInterval) clearInterval(window._versionCheckInterval);
-  window._versionCheckInterval=setInterval(async function(){
-    if(!window._fbActivo||!window._fbDB||!window._fbCol) return;
-    try{
-      const snap=await window._fbDB.collection(window._fbCol).doc('system_version').get();
-      if(!snap.exists) return;
-      const remoteVersion=snap.data().version;
-      const localVersion=localStorage.getItem('app_version');
-      if(remoteVersion&&localVersion&&remoteVersion!==localVersion){
-        // Hay versión nueva — recargar silenciosamente
-        localStorage.setItem('app_version',remoteVersion);
-        window.location.reload(true);
-      }
-    }catch(e){console.warn('Version check error:',e.message);}
-  },30000);
+  // Verificar de inmediato al arrancar
+  verificarVersionFirebase();
+  // Luego cada 30 segundos
+  window._versionCheckInterval=setInterval(verificarVersionFirebase,30000);
 }
 
 function fbActivarListeners(){
@@ -9841,8 +9860,6 @@ window.fbIniciar = async function(){
       window._fbCargado=true;
       // Activar listeners de tiempo real
       if(typeof fbActivarListeners==='function') fbActivarListeners();
-      // Iniciar verificador de versión
-      if(typeof iniciarVerificadorVersion==='function') iniciarVerificadorVersion();
       // Actualizar sidebar con logo de Firebase
       if(typeof actualizarLogoSidebar==='function') actualizarLogoSidebar();
       // Actualizar topbar empresa

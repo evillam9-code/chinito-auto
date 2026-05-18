@@ -208,22 +208,23 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 <script>
 (function(){
   var VERSION='dealer_v14';
-  var APP_BUILD='20260515-01';
-  var storedBuild=localStorage.getItem('ds_build');
+  var APP_BUILD='20260517-chinito';
+  var storedBuild=localStorage.getItem('chinito_build');
   if(storedBuild && storedBuild!==APP_BUILD){
-    // Version nueva — limpiar localStorage viejo y recargar forzado
-    var savedUsers=localStorage.getItem('ds_users');
-    var savedConfig=localStorage.getItem('ds_config');
+    var savedUsers=localStorage.getItem('chinito_users');
+    var savedConfig=localStorage.getItem('chinito_config');
     localStorage.clear();
-    if(savedUsers)localStorage.setItem('ds_users',savedUsers);
-    if(savedConfig)localStorage.setItem('ds_config',savedConfig);
-    localStorage.setItem('ds_build',APP_BUILD);
-    localStorage.setItem('ds_version',VERSION);
+    if(savedUsers)localStorage.setItem('chinito_users',savedUsers);
+    if(savedConfig)localStorage.setItem('chinito_config',savedConfig);
+    localStorage.setItem('chinito_build',APP_BUILD);
+    localStorage.setItem('chinito_version',VERSION);
     window.location.reload(true);
     return;
   }
-  localStorage.setItem('ds_build',APP_BUILD);
-  localStorage.setItem('ds_version',VERSION);
+  localStorage.setItem('chinito_build',APP_BUILD);
+  localStorage.setItem('chinito_version',VERSION);
+  // Limpiar claves ds_ residuales de versiones anteriores
+  try{const old=Object.keys(localStorage).filter(k=>k.startsWith('ds_'));old.forEach(k=>localStorage.removeItem(k));}catch{}
 })();
 </script>
 </head>
@@ -312,7 +313,7 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
     <div class="nav-item" onclick="showPage('alertas')" id="nav-alertas"><span class="ico">🔔</span>Alertas del Sistema</div>
     <div class="nav-item" onclick="showPage('cuentasBancarias')" id="nav-cuentasBancarias"><span class="ico">🏦</span>Cuentas Bancarias</div>
         <div class="nav-item" onclick="showPage('cumpleanos')" id="nav-cumpleanos"><span class="ico">🎂</span>Cumpleaños</div>
-      <div class="nav-item" id="nav-backup-btn" style="display:none;color:var(--green)" onclick="showPage('backup')"><span class="ico">💾</span>Backup</div>
+      <div class="nav-item" id="nav-backup" style="display:none;color:var(--green)" onclick="showPage('backup')"><span class="ico">💾</span>Backup</div>
     <div class="nav-item" onclick="showPage('config')" id="nav-config"><span class="ico">⚙️</span>Configuración</div>
     <div style="margin-top:auto;border-top:1px solid var(--gray3)">
       <div style="padding:10px 16px 6px;font-size:10px;color:#94a3b8;text-align:center;line-height:1.5">
@@ -373,8 +374,8 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
 
 <script>
 // STORAGE
-const ls=k=>{try{const v=localStorage.getItem('ds_'+k);return v?JSON.parse(v):null}catch{return null}};
-const ss=(k,v)=>{try{localStorage.setItem('ds_'+k,JSON.stringify(v))}catch{}};
+const ls=k=>{try{const v=localStorage.getItem('chinito_'+k);return v?JSON.parse(v):null}catch{return null}};
+const ss=(k,v)=>{try{localStorage.setItem('chinito_'+k,JSON.stringify(v))}catch{}};
 
 // DEFAULT CONFIG
 const defaultConfig={
@@ -702,7 +703,7 @@ function aplicarPermisosNav(){
     nav.style.display=tiene?'':'none';
   });
   // Backup solo para admin
-  const nbk=document.getElementById('nav-backup-btn');
+  const nbk=document.getElementById('nav-backup');
   if(nbk)nbk.style.display=currentUser.role==='admin'?'':'none';
 }
 
@@ -759,7 +760,7 @@ function guardarNuevaContrasena(uid,esPropio){
 
 function doLogout(){
   if(currentUser){
-    try{const p=JSON.parse(localStorage.getItem('fayre_presencia')||'{}');delete p[currentUser.id];localStorage.setItem('fayre_presencia',JSON.stringify(p));}catch{}
+    try{const p=JSON.parse(localStorage.getItem('chinito_presencia')||'{}');delete p[currentUser.id];localStorage.setItem('chinito_presencia',JSON.stringify(p));}catch{}
     if(window._presenciaBC)try{window._presenciaBC.postMessage({uid:currentUser.id,ts:0});}catch{}
     if(window._presenciaGlobalInterval)clearInterval(window._presenciaGlobalInterval);
   }
@@ -779,11 +780,17 @@ function showPage(id){
   if(sb&&window.innerWidth<=768){sb.classList.remove('open');if(ov)ov.classList.remove('open');}
   // Limpiar intervalo de usuarios si navegamos a otra página
   if(id!=='usuarios'&&window._usuariosRefreshInterval){clearInterval(window._usuariosRefreshInterval);window._usuariosRefreshInterval=null;}
+  const r={dashboard:renderDashboard,inventario:renderInventario,ventas:renderVentas,cotizaciones:renderCotizaciones,clientes:renderClientes,suplidores:renderSuplidores,caja:renderCaja,gastos:renderGastos,nomina:renderNomina,informes:renderInformes,usuarios:renderUsuarios,config:renderConfig,gastosVeh:renderGastosVeh,cxp:renderCXP,cxc:renderCXC,autorizaciones:renderAutorizaciones,seguros:renderSeguros,facturaExterna:renderFacturaExterna,alertas:renderAlertas,chat:renderChat,cuentasBancarias:renderCuentasBancarias,cumpleanos:renderCumpleanos,backup:renderBackup};
+  // Refresh Firebase si han pasado más de 60 segundos
+  const ahora=Date.now();
+  if(window._fbActivo&&window._fbCargado&&(!window._lastFbRefresh||ahora-window._lastFbRefresh>60000)){
+    window._lastFbRefresh=ahora;
+    if(typeof fbCargar==='function')fbCargar().then(()=>{if(r[id])r[id]();}).catch(()=>{});
+  }
   // Verificar acceso al módulo (solo para no-admin)
   if(id!=='dashboard'&&currentUser?.role!=='admin'&&!canAccess(id)){toast('No tienes acceso a este módulo','error');return;}
   document.getElementById('page-'+id)?.classList.add('active');
   document.getElementById('nav-'+id)?.classList.add('active');
-  const r={dashboard:renderDashboard,inventario:renderInventario,ventas:renderVentas,cotizaciones:renderCotizaciones,clientes:renderClientes,suplidores:renderSuplidores,caja:renderCaja,gastos:renderGastos,nomina:renderNomina,informes:renderInformes,usuarios:renderUsuarios,config:renderConfig,gastosVeh:renderGastosVeh,cxp:renderCXP,cxc:renderCXC,autorizaciones:renderAutorizaciones,seguros:renderSeguros,facturaExterna:renderFacturaExterna,alertas:renderAlertas,chat:renderChat,cuentasBancarias:renderCuentasBancarias,cumpleanos:renderCumpleanos,backup:renderBackup};
   if(r[id])r[id]();
 }
 
@@ -797,12 +804,14 @@ function showNotif(title,msg,type='danger'){
 }
 function checkAlerts(){
   const c=document.getElementById('alert-container');if(c)c.innerHTML='';
+  // Respetar permisos: si no tiene acceso al módulo alertas, no mostrar popups
+  if(!canAccess('alertas'))return;
   const hoy=today();
-  // Obtener alertas permitidas del usuario actual
-  const alertasPermitidas=currentUser?.role==='admin'
-    ?null // admin ve todo
-    // Solo las marcadas. Si alertasPermitidas no existe en el usuario = arreglo vacío (no ver ninguna)
-    :(currentUser?.alertasPermitidas||[]);
+  // alertasPermitidas aplica a TODOS incluyendo admin
+  const esAdmin=currentUser?.role==='admin';
+  const alertasPermitidas=currentUser?.alertasPermitidas!==undefined
+    ?currentUser.alertasPermitidas
+    :(esAdmin?null:['SIN_VIN','SIN_COSTO','CXP','CXC_VENCIDA','CXC','SIN_VENDER_6M','SIN_VENDER_1A','DOCS']);
   const puedeVer=tipo=>!alertasPermitidas||alertasPermitidas.includes(tipo);
 
   if(puedeVer('SIN_VIN')){
@@ -880,12 +889,8 @@ function imprimirDashboard(){
   win.document.close();
 }
 function renderDashboard(){
-  // Datos frescos
-  DB.vehiculos=ls('vehiculos')||DB.vehiculos;
-  DB.ventas=ls('ventas')||DB.ventas;
-  DB.gastosVehiculos=ls('gastosVehiculos')||DB.gastosVehiculos;
-  DB.cxc=ls('cxc')||DB.cxc;
-  DB.suplidores=ls('suplidores')||DB.suplidores;
+  // DB ya contiene datos frescos de Firebase — no leer localStorage
+
 
   const mes=document.getElementById('dash-mes')?.value||'';
   const dia=document.getElementById('dash-dia')?.value||'';
@@ -972,13 +977,13 @@ function renderDashboard(){
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
       <div class="card" style="margin-bottom:0;border-top:4px solid var(--green)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gray);margin-bottom:10px">💰 Ventas del Período</div>
-        ${totalVRD>0?`<div style="font-size:18px;font-weight:800;color:var(--green)">${totalVRD.toLocaleString('es-DO',{minimumFractionDigits:2})}</div><div style="font-size:11px;color:var(--gray)">RD$ — ${ventasRD.length} venta(s)</div>`:'' }
+        ${totalVRD>0?`<div style="font-size:18px;font-weight:800;color:var(--green)">${fmt(totalVRD)}</div><div style="font-size:11px;color:var(--gray)">RD$ — ${ventasRD.length} venta(s)</div>`:'' }
         ${totalVUSD>0?`<div style="font-size:18px;font-weight:800;color:var(--blue);margin-top:4px">$${totalVUSD.toLocaleString('en-US',{minimumFractionDigits:2})} USD</div><div style="font-size:11px;color:var(--gray)">${ventasUSD.length} venta(s)</div>`:'' }
         ${totalVRD===0&&totalVUSD===0?`<div style="font-size:16px;font-weight:700;color:var(--gray)">Sin ventas en período</div>`:'' }
       </div>
       <div class="card" style="margin-bottom:0;border-top:4px solid var(--blue)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gray);margin-bottom:10px">💼 Inversión en Inventario</div>
-        ${inversionRD>0?`<div style="font-size:18px;font-weight:800;color:var(--navy)">${inversionRD.toLocaleString('es-DO',{minimumFractionDigits:2})}</div><div style="font-size:11px;color:var(--gray)">RD$ acumulados</div>`:'' }
+        ${inversionRD>0?`<div style="font-size:18px;font-weight:800;color:var(--navy)">${fmt(inversionRD)}</div><div style="font-size:11px;color:var(--gray)">RD$ acumulados</div>`:'' }
         ${inversionUSD>0?`<div style="font-size:18px;font-weight:800;color:var(--blue);margin-top:4px">$${inversionUSD.toLocaleString('en-US',{minimumFractionDigits:2})} USD</div><div style="font-size:11px;color:var(--gray)">USD acumulados</div>`:'' }
         ${inversionRD===0&&inversionUSD===0?`<div style="font-size:16px;font-weight:700;color:var(--gray)">Sin inversión</div>`:'' }
       </div>
@@ -1024,12 +1029,12 @@ function renderDashboard(){
       <div class="card" style="margin-bottom:0;border-top:4px solid ${cxcPend.length>0?'var(--amber)':'var(--green)'};cursor:pointer" onclick="showPage('cxc')">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gray);margin-bottom:8px">📬 Por Cobrar</div>
         <div style="font-size:28px;font-weight:900;color:var(--amber)">${cxcPend.length}</div>
-        <div style="font-size:11px;color:var(--gray);margin-top:4px">${cxcMonto.toLocaleString('es-DO',{minimumFractionDigits:2})} pendiente</div>
+        <div style="font-size:11px;color:var(--gray);margin-top:4px">${fmt(cxcMonto)} pendiente</div>
       </div>
       <div class="card" style="margin-bottom:0;border-top:4px solid ${cxpPend.length>0?'var(--red)':'var(--green)'};cursor:pointer" onclick="showPage('cxp')">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gray);margin-bottom:8px">📑 Por Pagar</div>
         <div style="font-size:28px;font-weight:900;color:var(--red)">${cxpPend.length}</div>
-        ${cxpRD>0?`<div style="font-size:11px;color:var(--gray)">RD$ ${cxpRD.toLocaleString('es-DO',{minimumFractionDigits:2})}</div>`:''}
+        ${cxpRD>0?`<div style="font-size:11px;color:var(--gray)">${fmt(cxpRD)}</div>`:''}
         ${cxpUSD>0?`<div style="font-size:11px;color:var(--blue)">$${cxpUSD.toLocaleString('en-US',{minimumFractionDigits:2})} USD</div>`:''}
       </div>
     </div>
@@ -2479,7 +2484,7 @@ function _actualizarBadgesOnlineUsuarios(){
   const pU=document.getElementById('page-usuarios');
   if(!pU||!pU.classList.contains('active'))return;
   const ahora=Date.now();
-  let presGlobal={};try{presGlobal=JSON.parse(localStorage.getItem('fayre_presencia')||'{}');}catch{}
+  let presGlobal={};try{presGlobal=JSON.parse(localStorage.getItem('chinito_presencia')||'{}');}catch{}
   // Actualizar badge contador de en línea
   const badge=document.getElementById('usuarios-online-badge');
   if(badge){
@@ -2611,7 +2616,7 @@ function renderUsuarios(){
         <span>👥 Usuarios del sistema</span>
         <span id="usuarios-online-badge" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green);background:var(--green2);border-radius:20px;padding:4px 12px">
           <span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse-dot 1.5s infinite"></span>
-          ${(()=>{const ahora=Date.now();const en=(DB.users||[]).filter(u=>{let p={};try{p=JSON.parse(localStorage.getItem('fayre_presencia')||'{}');}catch{}const ult=p[u.id]||(DB.presencia||{})[u.id]||0;return ult>0&&(ahora-ult)<30000;});return en.length;})()}  en línea — actualización en vivo
+          ${(()=>{const ahora=Date.now();const en=(DB.users||[]).filter(u=>{let p={};try{p=JSON.parse(localStorage.getItem('chinito_presencia')||'{}');}catch{}const ult=p[u.id]||(DB.presencia||{})[u.id]||0;return ult>0&&(ahora-ult)<30000;});return en.length;})()}  en línea — actualización en vivo
         </span>
       </div>
       <div class="table-wrap"><table>
@@ -2624,7 +2629,7 @@ function renderUsuarios(){
           const mods=u.role==='admin'?['Dashboard','Nueva Venta','Ventas','Inventario','Clientes','Suplidores','Gastos','Nómina','Informes','Caja','CxC','CxP','Usuarios','Configuración']:(u.modulos||[]);
           const modsLabel=mods.map(id=>{const m=MODS.find(x=>x.id===id);return m?m.label:id;});
           const ahora=Date.now();
-          let presGlobal={};try{presGlobal=JSON.parse(localStorage.getItem('fayre_presencia')||'{}');}catch{}
+          let presGlobal={};try{presGlobal=JSON.parse(localStorage.getItem('chinito_presencia')||'{}');}catch{}
           const ult=presGlobal[u.id]||(DB.presencia||{})[u.id]||0;
           const enLinea=ult>0&&(ahora-ult)<30000;
           const estadoHTML=enLinea
@@ -3612,8 +3617,36 @@ function cbConfirmarEliminar(bi,ci){
 
 function renderConfig(){
   const c=DB.config;
-  // Si Firebase activo pero aún no cargó, mostrar aviso
   const fbPendiente=window._fbActivo&&!window._fbCargado;
+  const ALERT_TYPES_ALL=[
+    {id:'SIN_VIN',label:'Vehículo sin Chasis/VIN'},
+    {id:'SIN_COSTO',label:'Vehículo sin costos'},
+    {id:'CXP',label:'Gastos por pagar (CxP)'},
+    {id:'CXC_VENCIDA',label:'CxC vencidas'},
+    {id:'CXC',label:'CxC pendientes'},
+    {id:'SIN_VENDER_6M',label:'6 meses sin venderse'},
+    {id:'SIN_VENDER_1A',label:'1 año sin venderse'},
+    {id:'DOCS',label:'Documentos de entrega pendientes'}
+  ];
+  const misAlertas=currentUser?.alertasPermitidas||ALERT_TYPES_ALL.map(a=>a.id);
+  const misNotifHTML=`
+    <div class="card">
+      <div class="card-title">🔔 Mis Notificaciones al Entrar</div>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:14px">Selecciona cuáles alertas quieres ver al iniciar sesión. Si desactivas una, el popup ya no aparecerá.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        ${ALERT_TYPES_ALL.map(a=>`
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;padding:6px 12px;background:var(--gray2);border:1.5px solid var(--gray3);border-radius:8px;cursor:pointer">
+            <input type="checkbox" id="mn-${a.id}" ${misAlertas.includes(a.id)?'checked':''} style="accent-color:var(--blue);width:14px;height:14px">
+            ${a.label}
+          </label>`).join('')}
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="guardarMisNotificaciones()">💾 Guardar mis notificaciones</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.querySelectorAll('[id^=mn-]').forEach(c=>c.checked=true)">✅ Activar todas</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.querySelectorAll('[id^=mn-]').forEach(c=>c.checked=false)">🔕 Desactivar todas</button>
+      </div>
+    </div>`;
+  // Si Firebase activo pero aún no cargó, mostrar aviso
   document.getElementById('page-config').innerHTML=`
     <div class="page-header"><div><h1>⚙️ Configuración</h1><p>Información del negocio</p></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -3624,6 +3657,7 @@ function renderConfig(){
       </div>
     </div>
     ${fbPendiente?'<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#92400e;display:flex;align-items:center;gap:8px"><span>⏳</span> Sincronizando con Firebase... Los datos se actualizarán en unos segundos.</div>':''}
+    ${misNotifHTML}
     <div class="card">
       <div class="card-title">🏢 Información del Negocio</div>
       <div class="form-row c2">
@@ -3902,6 +3936,18 @@ function renderConfig(){
 
     </div>`;
 }
+function guardarMisNotificaciones(){
+  const ALERT_IDS=['SIN_VIN','SIN_COSTO','CXP','CXC_VENCIDA','CXC','SIN_VENDER_6M','SIN_VENDER_1A','DOCS'];
+  const seleccionadas=ALERT_IDS.filter(id=>{const el=document.getElementById('mn-'+id);return el&&el.checked;});
+  const idx=DB.users.findIndex(u=>u.id===currentUser.id);
+  if(idx!==-1){
+    DB.users[idx].alertasPermitidas=seleccionadas;
+    currentUser.alertasPermitidas=seleccionadas;
+    sDB('users');
+    if(typeof fbGuardar==='function'&&window._fbActivo)fbGuardar('users').catch(()=>{});
+    toast('Notificaciones guardadas \u2713','success');
+  }
+}
 function agregarRolConfig(){
   const list=document.getElementById('cf-roles-list');
   const i=list.children.length;
@@ -4098,8 +4144,8 @@ function _chatScrollBottom(){
 }
 
 // ══ PRESENCIA GLOBAL (funciona sin servidor, entre pestañas locales) ══
-function _leerPresenciaGlobal(){try{return JSON.parse(localStorage.getItem('fayre_presencia')||'{}');}catch{return {};}}
-function _escribirPresenciaGlobal(uid,ts){const p=_leerPresenciaGlobal();p[uid]=ts;localStorage.setItem('fayre_presencia',JSON.stringify(p));}
+function _leerPresenciaGlobal(){try{return JSON.parse(localStorage.getItem('chinito_presencia')||'{}');}catch{return {};}}
+function _escribirPresenciaGlobal(uid,ts){const p=_leerPresenciaGlobal();p[uid]=ts;localStorage.setItem('chinito_presencia',JSON.stringify(p));}
 function _sincPresencia(){
   const g=_leerPresenciaGlobal();
   DB.presencia=Object.assign(DB.presencia||{},g);
@@ -4135,13 +4181,13 @@ function _iniciarPresenciaGlobal(){
   if(!currentUser)return;
   try{
     if(window._presenciaBC)window._presenciaBC.close();
-    window._presenciaBC=new BroadcastChannel('fayre_presencia');
+    window._presenciaBC=new BroadcastChannel('chinito_presencia');
     window._presenciaBC.onmessage=function(e){
       if(e.data&&e.data.uid){
         if(!DB.presencia)DB.presencia={};
         if(e.data.ts===0){
           delete DB.presencia[e.data.uid];
-          const p=_leerPresenciaGlobal();delete p[e.data.uid];localStorage.setItem('fayre_presencia',JSON.stringify(p));
+          const p=_leerPresenciaGlobal();delete p[e.data.uid];localStorage.setItem('chinito_presencia',JSON.stringify(p));
         } else {
           DB.presencia[e.data.uid]=e.data.ts;
           _escribirPresenciaGlobal(e.data.uid,e.data.ts);
@@ -4164,7 +4210,7 @@ function _iniciarPresenciaGlobal(){
   },8000);
   window.addEventListener('beforeunload',()=>{
     if(currentUser){
-      const p=_leerPresenciaGlobal();delete p[currentUser.id];localStorage.setItem('fayre_presencia',JSON.stringify(p));
+      const p=_leerPresenciaGlobal();delete p[currentUser.id];localStorage.setItem('chinito_presencia',JSON.stringify(p));
       if(window._presenciaBC)try{window._presenciaBC.postMessage({uid:currentUser.id,ts:0});}catch{}
     }
   },{once:true});
@@ -9674,7 +9720,7 @@ async function fbCargar(){
             });
             DB[key]=merged.length>0?merged:DB[key];
             // Sobrescribir localStorage con la versión de Firebase (elimina datos viejos de Edge)
-            try{localStorage.setItem('ds_users',JSON.stringify(DB[key]));}catch{}
+            try{localStorage.setItem('chinito_users',JSON.stringify(DB[key]));}catch{}
           } else if(key==='config_logo'){
             const logoVal=typeof val==='string'?val:(val&&val.logoData?val.logoData:'');
             if(logoVal&&logoVal.startsWith('data:')){
@@ -9692,7 +9738,7 @@ async function fbCargar(){
           }
           // Sincronizar localStorage con Firebase para que Edge no use datos viejos
           if(key!=='config_logo'){
-            try{localStorage.setItem('ds_'+key,JSON.stringify(DB[key]));}catch{}
+            try{localStorage.setItem('chinito_'+key,JSON.stringify(DB[key]));}catch{}
           }
           loaded=true;
         }
@@ -9802,7 +9848,7 @@ function fbActivarListeners(){
           });
           DB.users=merged.length>0?merged:DB.users;
           // Actualizar localStorage para mantener sync
-          try{localStorage.setItem('ds_users',JSON.stringify(DB.users));}catch{}
+          try{localStorage.setItem('chinito_users',JSON.stringify(DB.users));}catch{}
           // Fix 3 — detectar cambios de permisos/módulos del usuario activo en tiempo real
           if(window.currentUser){
             const updatedMe=DB.users.find(u=>u.id===window.currentUser.id);
@@ -9830,7 +9876,7 @@ function fbActivarListeners(){
           // Merge presencia remota con local
           DB.presencia=Object.assign(DB.presencia||{},val);
           // Escribir en localStorage para coherencia local
-          localStorage.setItem('fayre_presencia',JSON.stringify(DB.presencia));
+          localStorage.setItem('chinito_presencia',JSON.stringify(DB.presencia));
           // Refrescar tabla de usuarios si está activa (sin afectar otras páginas)
           const pU=document.getElementById('page-usuarios');
           if(pU&&pU.classList.contains('active')){

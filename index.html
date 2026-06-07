@@ -262,11 +262,11 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
   <div class="wc-inner">
     <div id="wc-logo-wrap" style="margin-bottom:20px;display:flex;align-items:center;justify-content:center">
       <div id="wc-logo-img-wrap" style="display:none"><img id="wc-logo-img" src="" style="max-height:100px;max-width:220px;object-fit:contain;border-radius:12px;background:rgba(255,255,255,.08);padding:10px"></div>
-      <div id="wc-logo-fallback" style="font-size:64px">🏢</div>
+      <div id="wc-logo-fallback" style="font-size:64px">🚗</div>
     </div>
-    <div class="wc-title" id="wc-title-empresa"><span style="color:#60a5fa">Dealer</span>System</div>
-    <div class="wc-sub" id="wc-empresa">Sistema de Gestión Vehicular</div>
-    <div class="wc-user" id="wc-bienvenida">Bienvenido</div>
+    <div class="wc-title" id="wc-title-empresa"><span style="color:#60a5fa">Chinito</span> Auto Import</div>
+    <div class="wc-sub" id="wc-empresa">CHINITO AUTO IMPORT</div>
+    <div class="wc-user" id="wc-bienvenida">Bienvenido al sistema</div>
     <div class="wc-bar"><div class="wc-fill"></div></div>
   </div>
 </div>
@@ -614,12 +614,12 @@ function doLogin(){
     } else {
       if(wcLogoImg)wcLogoImg.style.display='none';
       if(wcLogoWrap)wcLogoWrap.style.display='none';
-      if(wcLogoFallback)wcLogoFallback.style.display='none';
+      if(wcLogoFallback)wcLogoFallback.style.display='block';
       if(wcTitle){
         wcTitle.style.display='block';
         wcTitle.innerHTML=nombreEmpresa
           ?'<span style="color:#fff;font-size:36px;font-weight:900">'+escHtml(nombreEmpresa)+'</span>'
-          :'<span style="color:#60a5fa">Dealer</span>System';
+          :'<span style="color:#60a5fa">Chinito</span> Auto Import';
       }
     }
   };
@@ -5732,12 +5732,20 @@ function nuevaVenta(){
       </div>
     </div>
     <div id="sv-veh-info" style="display:none;background:var(--blue3);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px"></div>
-    <div class="form-row c3">
+    <div class="form-row c2">
       <div class="form-field"><label>Fecha de Venta</label><input type="date" id="sv-fecha" value="${today()}"></div>
       <div class="form-field"><label>Método de Pago</label>
         <select id="sv-pago">
           <option>Contado</option><option>Financiamiento</option>
           <option>Transferencia</option><option>Cheque</option><option>Mixto</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row c3" style="margin-bottom:4px">
+      <div class="form-field"><label>Moneda de Venta</label>
+        <select id="sv-moneda" onchange="toggleTasaVenta();calcPend()">
+          <option value="RD$">RD$ — Pesos</option>
+          <option value="USD">USD — Dólares</option>
         </select>
       </div>
       <div class="form-field"><label>Banco</label>
@@ -5751,17 +5759,11 @@ function nuevaVenta(){
         </select>
       </div>
     </div>
-    <div class="form-row c3" style="margin-bottom:4px">
-      <div class="form-field"><label>Moneda de Venta</label>
-        <select id="sv-moneda" onchange="toggleTasaVenta();calcPend()">
-          <option value="RD$">RD$ — Pesos</option>
-          <option value="USD">USD — Dólares</option>
-        </select>
-      </div>
-      <div id="sv-tasa-wrap" style="display:none" class="form-field"><label>💱 Tasa del Día (RD$ x USD)</label>
+    <div class="form-row c2" id="sv-tasa-row" style="display:none">
+      <div id="sv-tasa-wrap" class="form-field"><label>💱 Tasa del Día (RD$ x USD)</label>
         <input type="number" id="sv-tasa" step="0.01" value="${DB.config.tasaCambio||60}" placeholder="Ej: 60.50" oninput="calcPend()">
       </div>
-      <div id="sv-equiv-wrap" style="display:none" class="form-field"><label>Equivalente en RD$</label>
+      <div id="sv-equiv-wrap" class="form-field"><label>Equivalente en RD$</label>
         <input type="text" id="sv-equiv" readonly style="background:#f8fafc;font-weight:700;color:var(--blue)">
       </div>
     </div>
@@ -5809,7 +5811,7 @@ function nuevaVenta(){
       </div>
 
       <!-- PASO 3a: Detalles Endoso -->
-      <div id="sv-endoso-wrap">
+      <div id="sv-endoso-wrap" style="display:none">
         <div class="form-row c2" style="margin-bottom:8px">
           <div class="form-field" style="margin:0">
             <label style="font-size:10px;font-weight:700">💰 Costo del Endoso</label>
@@ -5895,6 +5897,13 @@ function nuevaVenta(){
     </div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
      <button class="btn btn-green" onclick="confirmarVenta('${nf}')">✅ Confirmar Venta</button>`);
+  // Activar Endorso por defecto al abrir el modal
+  const _activarEndoso=()=>{
+    const btn=document.getElementById('sv-btn-endoso');
+    if(btn){svSelTitulacion('endoso');}
+    else{setTimeout(_activarEndoso,50);}
+  };
+  setTimeout(_activarEndoso,100);
 }
 
 let ventaSelectedId=null;
@@ -6132,15 +6141,15 @@ function svSelTitulacion(tipo){
   // Activar seleccionado
   if(tipo==='endoso'){
     if(btnEndoso)btnEndoso.style.cssText='flex:1;min-width:100px;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;'+activeStyle;
-    if(endosoWrap)endosoWrap.style.display='';
+    if(endosoWrap)endosoWrap.style.display='block';
     if(traspasoWrap)traspasoWrap.style.display='none';
-    if(gestorWrap)gestorWrap.style.display='';
+    if(gestorWrap)gestorWrap.style.display='block';
     if(tipoInput)tipoInput.value='endoso';
   } else if(tipo==='traspaso'){
     if(btnTraspaso)btnTraspaso.style.cssText='flex:1;min-width:100px;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;'+activeStyle;
     if(endosoWrap)endosoWrap.style.display='none';
-    if(traspasoWrap)traspasoWrap.style.display='';
-    if(gestorWrap)gestorWrap.style.display='';
+    if(traspasoWrap)traspasoWrap.style.display='block';
+    if(gestorWrap)gestorWrap.style.display='block';
     if(tipoInput)tipoInput.value='traspaso';
     toggleTraspasoFields();
   } else {
@@ -6443,12 +6452,20 @@ function nuevaVenta(){
       </div>
     </div>
     <div id="sv-veh-info" style="display:none;background:var(--blue3);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px"></div>
-    <div class="form-row c3">
+    <div class="form-row c2">
       <div class="form-field"><label>Fecha de Venta</label><input type="date" id="sv-fecha" value="${today()}"></div>
       <div class="form-field"><label>Método de Pago</label>
         <select id="sv-pago">
           <option>Contado</option><option>Financiamiento</option>
           <option>Transferencia</option><option>Cheque</option><option>Mixto</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row c3" style="margin-bottom:4px">
+      <div class="form-field"><label>Moneda de Venta</label>
+        <select id="sv-moneda" onchange="toggleTasaVenta();calcPend()">
+          <option value="RD$">RD$ — Pesos</option>
+          <option value="USD">USD — Dólares</option>
         </select>
       </div>
       <div class="form-field"><label>Banco</label>
@@ -6462,17 +6479,11 @@ function nuevaVenta(){
         </select>
       </div>
     </div>
-    <div class="form-row c3" style="margin-bottom:4px">
-      <div class="form-field"><label>Moneda de Venta</label>
-        <select id="sv-moneda" onchange="toggleTasaVenta();calcPend()">
-          <option value="RD$">RD$ — Pesos</option>
-          <option value="USD">USD — Dólares</option>
-        </select>
-      </div>
-      <div id="sv-tasa-wrap" style="display:none" class="form-field"><label>💱 Tasa del Día (RD$ x USD)</label>
+    <div class="form-row c2" id="sv-tasa-row" style="display:none">
+      <div id="sv-tasa-wrap" class="form-field"><label>💱 Tasa del Día (RD$ x USD)</label>
         <input type="number" id="sv-tasa" step="0.01" value="${DB.config.tasaCambio||60}" placeholder="Ej: 60.50" oninput="calcPend()">
       </div>
-      <div id="sv-equiv-wrap" style="display:none" class="form-field"><label>Equivalente en RD$</label>
+      <div id="sv-equiv-wrap" class="form-field"><label>Equivalente en RD$</label>
         <input type="text" id="sv-equiv" readonly style="background:#f8fafc;font-weight:700;color:var(--blue)">
       </div>
     </div>
@@ -10417,61 +10428,6 @@ function aplicarColoresSistema(){
   }
 }
 
-// Aplicar colores al cargar
-document.addEventListener('DOMContentLoaded',()=>{
-  // Autocomplete OFF en todos los campos
-  document.querySelectorAll('input:not([type=password]),select,textarea').forEach(el=>{el.setAttribute('autocomplete','off');});
-  const _acObs=new MutationObserver(ms=>{ms.forEach(m=>{m.addedNodes.forEach(n=>{if(n.querySelectorAll){n.querySelectorAll('input:not([type=password]),select,textarea').forEach(el=>{if(!el.getAttribute('autocomplete'))el.setAttribute('autocomplete','off');});}});});});
-  _acObs.observe(document.body,{childList:true,subtree:true});
-  setInterval(()=>{if(currentUser)_chatActualizarBadge();},10000);
-  if(DB.config?.colores)aplicarColoresSistema();
-});
-
-// INIT — limpiar cualquier estado bloqueado al cargar
-(function(){
-  // Asegurar que los campos del login estén habilitados siempre al cargar
-  const liUser=document.getElementById('li-user');
-  const liPass=document.getElementById('li-pass');
-  const btnLogin=document.querySelector('.btn-login');
-  if(liUser){liUser.disabled=false;liUser.style.pointerEvents='';}
-  if(liPass){liPass.disabled=false;liPass.style.pointerEvents='';}
-  if(btnLogin){btnLogin.disabled=false;btnLogin.textContent='Ingresar al sistema →';btnLogin.style.pointerEvents='';}
-  // Ocultar welcome-screen si quedó visible
-  const ws=document.getElementById('welcome-screen');
-  if(ws){ws.style.display='none';ws.classList.remove('show');}
-  // Eliminar modal de error Firebase si quedó
-  const fbErr=document.getElementById('fb-error-modal');
-  if(fbErr)fbErr.remove();
-  window._fbErrorVisible=false;
-  window._fbArranque=true;
-  setTimeout(()=>{window._fbArranque=false;},6000);
-})();
-document.getElementById('li-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-document.getElementById('li-user').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('li-pass').focus();});
-function _iniciarConFirebase(){
-  if(typeof fbCargar==='function'){
-    const btn=document.querySelector('.btn-login');
-    const safetyTimeout=setTimeout(()=>{
-      if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
-    },8000);
-    fbCargar().then(async()=>{
-      clearTimeout(safetyTimeout);
-      window._fbActivo=true;
-      window._fbCargado=true;
-      if(typeof fbActivarListeners==='function') fbActivarListeners();
-      if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
-      const _dot=document.getElementById('fb-dot');
-      const _txt=document.getElementById('fb-text');
-      if(_dot)_dot.style.background='#22c55e';
-      if(_txt)_txt.textContent='✓ Firebase';
-      if(typeof iniciarVerificadorVersion==='function') iniciarVerificadorVersion();
-    }).catch(()=>{
-      clearTimeout(safetyTimeout);
-      if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
-    });
-  }
-}
-
 
 // ═══════════════════════════════════════════════════
 //  FUNCIONES TRASPLANTADAS DE MAEDIG
@@ -11467,13 +11423,13 @@ function svSelTitulacion(tipo){
     if(btnEndoso)btnEndoso.style.cssText='flex:1;min-width:100px;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;'+activeStyle;
     if(endosoWrap)endosoWrap.style.display='';
     if(traspasoWrap)traspasoWrap.style.display='none';
-    if(gestorWrap)gestorWrap.style.display='';
+    if(gestorWrap)gestorWrap.style.display='block';
     if(tipoInput)tipoInput.value='endoso';
   } else if(tipo==='traspaso'){
     if(btnTraspaso)btnTraspaso.style.cssText='flex:1;min-width:100px;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;'+activeStyle;
     if(endosoWrap)endosoWrap.style.display='none';
     if(traspasoWrap)traspasoWrap.style.display='';
-    if(gestorWrap)gestorWrap.style.display='';
+    if(gestorWrap)gestorWrap.style.display='block';
     if(tipoInput)tipoInput.value='traspaso';
     toggleTraspasoFields();
   } else {
@@ -11706,6 +11662,62 @@ function actualizarCuentasEGV(){
 }
 
 function editarGastoVehModal(gid,vid){editarGastoVeh(gid);}
+
+// Aplicar colores al cargar
+document.addEventListener('DOMContentLoaded',()=>{
+  // Autocomplete OFF en todos los campos
+  document.querySelectorAll('input:not([type=password]),select,textarea').forEach(el=>{el.setAttribute('autocomplete','off');});
+  const _acObs=new MutationObserver(ms=>{ms.forEach(m=>{m.addedNodes.forEach(n=>{if(n.querySelectorAll){n.querySelectorAll('input:not([type=password]),select,textarea').forEach(el=>{if(!el.getAttribute('autocomplete'))el.setAttribute('autocomplete','off');});}});});});
+  _acObs.observe(document.body,{childList:true,subtree:true});
+  setInterval(()=>{if(currentUser)_chatActualizarBadge();},10000);
+  if(DB.config?.colores)aplicarColoresSistema();
+});
+
+// INIT — limpiar cualquier estado bloqueado al cargar
+(function(){
+  // Asegurar que los campos del login estén habilitados siempre al cargar
+  const liUser=document.getElementById('li-user');
+  const liPass=document.getElementById('li-pass');
+  const btnLogin=document.querySelector('.btn-login');
+  if(liUser){liUser.disabled=false;liUser.style.pointerEvents='';}
+  if(liPass){liPass.disabled=false;liPass.style.pointerEvents='';}
+  if(btnLogin){btnLogin.disabled=false;btnLogin.textContent='Ingresar al sistema →';btnLogin.style.pointerEvents='';}
+  // Ocultar welcome-screen si quedó visible
+  const ws=document.getElementById('welcome-screen');
+  if(ws){ws.style.display='none';ws.classList.remove('show');}
+  // Eliminar modal de error Firebase si quedó
+  const fbErr=document.getElementById('fb-error-modal');
+  if(fbErr)fbErr.remove();
+  window._fbErrorVisible=false;
+  window._fbArranque=true;
+  setTimeout(()=>{window._fbArranque=false;},6000);
+})();
+document.getElementById('li-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('li-user').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('li-pass').focus();});
+function _iniciarConFirebase(){
+  if(typeof fbCargar==='function'){
+    const btn=document.querySelector('.btn-login');
+    const safetyTimeout=setTimeout(()=>{
+      if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
+    },8000);
+    fbCargar().then(async()=>{
+      clearTimeout(safetyTimeout);
+      window._fbActivo=true;
+      window._fbCargado=true;
+      if(typeof fbActivarListeners==='function') fbActivarListeners();
+      if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
+      const _dot=document.getElementById('fb-dot');
+      const _txt=document.getElementById('fb-text');
+      if(_dot)_dot.style.background='#22c55e';
+      if(_txt)_txt.textContent='✓ Firebase';
+      if(typeof iniciarVerificadorVersion==='function') iniciarVerificadorVersion();
+    }).catch(()=>{
+      clearTimeout(safetyTimeout);
+      if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
+    });
+  }
+}
+
 </script>
 <!-- ══ FIREBASE ══ -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

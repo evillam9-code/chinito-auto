@@ -26,8 +26,8 @@ body{font-family:'Outfit',sans-serif;background:var(--gray2);color:var(--navy);f
 .btn-login:disabled{background:#94a3b8;cursor:not-allowed;box-shadow:none}
 .login-blocked{display:none;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:20px;text-align:center}
 /* PANTALLA BIENVENIDA */
-#welcome-screen{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);align-items:center;justify-content:center;flex-direction:column;text-align:center;pointer-events:none}
-#welcome-screen.show{display:flex;pointer-events:all}
+#welcome-screen{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);align-items:center;justify-content:center;flex-direction:column;text-align:center}
+#welcome-screen.show{display:flex}
 .wc-inner{animation:wFadeIn .8s ease forwards}
 @keyframes wFadeIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
 .wc-title{font-size:42px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:8px}
@@ -614,7 +614,7 @@ function doLogin(){
     } else {
       if(wcLogoImg)wcLogoImg.style.display='none';
       if(wcLogoWrap)wcLogoWrap.style.display='none';
-      if(wcLogoFallback)wcLogoFallback.style.display='block';
+      if(wcLogoFallback)wcLogoFallback.style.display='none';
       if(wcTitle){
         wcTitle.style.display='block';
         wcTitle.innerHTML=nombreEmpresa
@@ -645,28 +645,20 @@ function doLogin(){
     _iniciarPresenciaGlobal();
     setTimeout(_verificarBackupAdmin,2500);
     setTimeout(_verificarCumpleanosHoy,3500);
-    // Sistema de versiones — admin publica la versión actual del código
-    if(currentUser?.role==='admin'){
-      setTimeout(async function(){
-        if(typeof publicarVersionActual==='function'&&window._fbActivo){
-          await publicarVersionActual();
-        }
-      },3000);
-    }
   };
   // Mostrar bienvenida con datos del localStorage primero
   _actualizarWelcome();
   ws.classList.add('show');
-  // Si Firebase ya precargó al arrancar, ir directo al dashboard
-  if(window._fbCargado){
-    _actualizarWelcome();
-    setTimeout(_entrarDashboard, 2000);
-  } else if(typeof fbIniciar==='function'){
-    // Firebase aún no cargó, cargar ahora
+  // Firebase es obligatorio — recargar siempre en cada login para garantizar datos frescos
+  if(typeof fbIniciar==='function'){
     let _localFbCargado=false;
+    // Timeout extendido para conexiones lentas
     const _fbTimeout=setTimeout(()=>{
-      if(!_localFbCargado) _entrarDashboard();
-    },2200);
+      if(!_localFbCargado){
+        // Firebase no respondió — bloquear entrada
+        _mostrarErrorFirebase();
+      }
+    },6000);
     fbIniciar().then(()=>{
       _localFbCargado=true;
       clearTimeout(_fbTimeout);
@@ -675,10 +667,10 @@ function doLogin(){
     }).catch(()=>{
       _localFbCargado=true;
       clearTimeout(_fbTimeout);
-      setTimeout(_entrarDashboard, 1000);
+      _mostrarErrorFirebase();
     });
   } else {
-    setTimeout(_entrarDashboard, 2200);
+    _mostrarErrorFirebase();
   }
 }
 function _getRolLabel(role){
@@ -701,75 +693,294 @@ function canDo(action){
   if(rolesAdmin.some(r=>currentUser.role?.toLowerCase()===r.toLowerCase()))return true;
   return (currentUser.permisos||{})[action]===true;
 }
+// ── Orden del menú lateral ─────────────────────────────
+// Definición completa de módulos con sección y etiqueta
+const MENU_DEFS=[
+  {id:'dashboard',   sec:'PRINCIPAL', ico:'🏠', label:'Inicio'},
+  {id:'informes',    sec:'PRINCIPAL', ico:'📊', label:'Informe Mensual'},
+  {id:'suplidores',  sec:'VEHÍCULOS', ico:'🏭', label:'Suplidores'},
+  {id:'inventario',  sec:'VEHÍCULOS', ico:'🚗', label:'Registro de Vehículo'},
+  {id:'gastosVeh',   sec:'VEHÍCULOS', ico:'💸', label:'Gastos de Vehículo'},
+  {id:'cxp',         sec:'VEHÍCULOS', ico:'📑', label:'Cuentas por Pagar'},
+  {id:'clientes',    sec:'CLIENTES',  ico:'👤', label:'Clientes'},
+  {id:'ventas',      sec:'CLIENTES',  ico:'💰', label:'Ventas'},
+  {id:'cxc',         sec:'CLIENTES',  ico:'📬', label:'Cuentas por Cobrar'},
+  {id:'gastos',      sec:'FINANZAS',  ico:'🏢', label:'Gastos Empresa'},
+  {id:'nomina',      sec:'FINANZAS',  ico:'👷', label:'Nómina'},
+  {id:'caja',        sec:'FINANZAS',  ico:'💳', label:'Caja'},
+  {id:'cotizaciones',sec:'OTROS',     ico:'📋', label:'Cotizaciones'},
+  {id:'autorizaciones',sec:'OTROS',   ico:'📝', label:'Autorización Compra'},
+  {id:'seguros',     sec:'OTROS',     ico:'🛡️', label:'Seguros'},
+  {id:'facturaExterna',sec:'OTROS',   ico:'🧾', label:'Facturas Externas'},
+  {id:'chat',        sec:'OTROS',     ico:'💬', label:'Chat Interno'},
+  {id:'prestamos',   sec:'SISTEMA',   ico:'🏛️', label:'Préstamos'},
+  {id:'cuentas',     sec:'SISTEMA',   ico:'🏦', label:'Cuentas'},
+  {id:'cumpleanos',  sec:'SISTEMA',   ico:'🎂', label:'Cumpleaños'},
+  {id:'alertas',     sec:'SISTEMA',   ico:'🔔', label:'Alertas del Sistema'},
+  {id:'usuarios',    sec:'SISTEMA',   ico:'👥', label:'Usuarios'},
+  {id:'config',      sec:'SISTEMA',   ico:'⚙️', label:'Configuración'},
+];
+
+// ── Sistema de Campos Requeridos ─────────────────────────
+const CAMPOS_MODULOS={
+  inventario:[
+    {id:'vin',        label:'Número de Chasis / VIN'},
+    {id:'placa',      label:'Placa del Vehículo'},
+    {id:'color',      label:'Color'},
+    {id:'motor',      label:'Número de Motor'},
+    {id:'anio',       label:'Año del Vehículo'},
+    {id:'costo',      label:'Costo de Compra'},
+    {id:'suplidor',   label:'Suplidor / Proveedor'},
+    {id:'tipoCompra', label:'Tipo de Compra'},
+  ],
+  ventas:[
+    {id:'cliente',    label:'Cliente'},
+    {id:'precio',     label:'Precio de Venta'},
+    {id:'metodoPago', label:'Método de Pago'},
+    {id:'fecha',      label:'Fecha de Venta'},
+    {id:'inicial',    label:'Inicial / Abono'},
+    {id:'gestor',     label:'Gestor de Transferencia'},
+    {id:'fechaEntrega',label:'Fecha de Entrega'},
+  ],
+  clientes:[
+    {id:'telefono',   label:'Teléfono / Celular'},
+    {id:'documento',  label:'Cédula / Documento'},
+    {id:'ciudad',     label:'Ciudad'},
+    {id:'direccion',  label:'Dirección'},
+    {id:'ingresos',   label:'Ingresos Mensuales'},
+    {id:'cumpleanos', label:'Fecha de Cumpleaños'},
+  ],
+  gastosVeh:[
+    {id:'suplidor',   label:'Suplidor'},
+    {id:'nroFactura', label:'Número de Factura'},
+    {id:'fechaPago',  label:'Fecha de Pago'},
+    {id:'banco',      label:'Banco / Cuenta'},
+  ],
+  gastos:[
+    {id:'suplidor',   label:'Suplidor'},
+    {id:'nroFactura', label:'Número de Factura'},
+    {id:'fechaLimite',label:'Fecha Límite de Pago'},
+    {id:'banco',      label:'Banco / Cuenta'},
+  ],
+  nomina:[
+    {id:'cedula',     label:'Cédula del Empleado'},
+    {id:'banco',      label:'Banco para Pago'},
+    {id:'numeroCuenta',label:'Número de Cuenta Bancaria'},
+    {id:'cargo',      label:'Cargo / Puesto'},
+  ],
+  cxc:[
+    {id:'fechaVence', label:'Fecha de Vencimiento'},
+    {id:'banco',      label:'Banco / Cuenta de Cobro'},
+  ],
+  seguros:[
+    {id:'poliza',     label:'Número de Póliza'},
+    {id:'vencimiento',label:'Fecha de Vencimiento'},
+    {id:'banco',      label:'Banco / Cuenta de Pago'},
+  ],
+  prestamos:[
+    {id:'entidad',    label:'Banco / Entidad Prestamista'},
+    {id:'tasa',       label:'Tasa de Interés'},
+    {id:'notas',      label:'Notas / Referencia Contrato'},
+  ],
+};
+
+// Verificar si un campo es requerido para un módulo
+function isRequired(modulo, campoId){
+  const cfg=DB.config.camposRequeridos||{};
+  // Si no está configurado, usar defaults (los que ya tienen class="required" en HTML)
+  if(!cfg[modulo])return false;
+  return cfg[modulo].includes(campoId);
+}
+
+// Verificar campos requeridos antes de guardar
+function validarCamposRequeridos(modulo, datos){
+  const cfg=DB.config.camposRequeridos||{};
+  const requeridos=cfg[modulo]||[];
+  const faltantes=[];
+  const defs=CAMPOS_MODULOS[modulo]||[];
+  requeridos.forEach(campoId=>{
+    const def=defs.find(d=>d.id===campoId);
+    const label=def?def.label:campoId;
+    const val=datos[campoId];
+    if(!val||String(val).trim()===''){
+      faltantes.push(label);
+    }
+  });
+  if(faltantes.length>0){
+    toast('Campos requeridos faltantes: '+faltantes.join(', '),'error');
+    return false;
+  }
+  return true;
+}
+
+function aplicarOrdenMenu(){
+  const orden=DB.config.menuOrden||[];
+  if(!orden.length)return; // sin personalización, usar orden HTML original
+  const sidebar=document.getElementById('sidebar');
+  if(!sidebar)return;
+  // Reconstruir nav-items en el orden guardado
+  // Solo reordenamos los nav-item, no tocamos secciones sb-sec ni el footer
+  orden.forEach(id=>{
+    const el=document.getElementById('nav-'+id);
+    if(el)sidebar.appendChild(el);
+  });
+}
+
 function aplicarPermisosNav(){
   if(!currentUser)return;
   // Ocultar nav-items de módulos sin acceso
   const MODS_NAV=['dashboard','informes','suplidores','inventario','gastosVeh','cxp',
-    'clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','usuarios','cuentasBancarias','config','cumpleanos','prestamos'];
+    'clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','usuarios','config','cuentas','cumpleanos','backup','prestamos'];
   MODS_NAV.forEach(id=>{
     const nav=document.getElementById('nav-'+id);
     if(!nav)return;
+    // Admin ve todo, otros solo lo que tienen asignado
     const tiene=currentUser.role==='admin'||canAccess(id);
     nav.style.display=tiene?'':'none';
   });
   // Backup solo para admin
-  const nbk=document.getElementById('nav-backup');
-  if(nbk)nbk.style.display=currentUser.role==='admin'?'':'none';
+  const backupBtn=document.getElementById('nav-backup');
+  if(backupBtn)backupBtn.style.display=currentUser?.role==='admin'?'flex':'none';
   const nbit=document.getElementById('nav-bitacora');
-  if(nbit)nbit.style.display=currentUser.role==='admin'?'':'none';
+  if(nbit)nbit.style.display=currentUser?.role==='admin'?'flex':'none';
+  // Informe Semanal solo para admin
+  const nInfSem=document.getElementById('nav-informeSemanal');
+  if(nInfSem)nInfSem.style.display=currentUser?.role==='admin'?'flex':'none';
 }
+/* ═══════════════════════════════════════════
+   BITÁCORA DE ACTIVIDAD — máx 200 entradas
+═══════════════════════════════════════════ */
+const _MOD_LABELS={dashboard:'Inicio',inventario:'Reg. Vehículo',gastosVeh:'Gastos Vehículo',
+  cxp:'Cuentas x Pagar',clientes:'Clientes',ventas:'Ventas',cxc:'Cuentas x Cobrar',
+  gastos:'Gastos Empresa',nomina:'Nómina',caja:'Caja',cotizaciones:'Cotizaciones',
+  autorizaciones:'Autorización',seguros:'Seguros',facturaExterna:'Facturas Ext.',
+  suplidores:'Suplidores',informes:'Informes',usuarios:'Usuarios',config:'Configuración',
+  cuentas:'Cuentas',backup:'Backup',bitacora:'Bitácora',alertas:'Alertas',chat:'Chat',prestamos:'Préstamos'};
 
-// ══ CAMBIO DE CONTRASEÑA ══════════════════════════════════════════════════
-function abrirCambiarContrasena(userId){
-  // Si se pasa userId, es el admin reseteando la de otro usuario
-  const targetUser=userId?DB.users.find(u=>u.id===userId):currentUser;
-  if(!targetUser)return;
-  const esPropio=!userId||userId===currentUser.id;
-  const titulo=esPropio?'🔑 Cambiar mi contraseña':'🔑 Resetear contraseña — '+escHtml(targetUser.nombre);
-  openModal(titulo,`
-    <div style="margin-bottom:16px">
-      <div style="font-size:13px;color:var(--gray);margin-bottom:16px">
-        ${esPropio?'Ingresa tu contraseña actual y la nueva contraseña.':'Establece una nueva contraseña para <strong>'+escHtml(targetUser.nombre)+'</strong>.'}
-      </div>
-      ${esPropio?`
-      <div class="form-field">
-        <label class="required">Contraseña actual</label>
-        <input type="password" id="cp-actual" placeholder="••••••••">
-      </div>`:''}
-      <div class="form-field">
-        <label class="required">Nueva contraseña</label>
-        <input type="password" id="cp-nueva" placeholder="Mínimo 4 caracteres">
-      </div>
-      <div class="form-field">
-        <label class="required">Confirmar nueva contraseña</label>
-        <input type="password" id="cp-confirmar" placeholder="Repite la contraseña">
-      </div>
-    </div>`,
-    `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-     <button class="btn btn-primary" onclick="guardarNuevaContrasena('${targetUser.id}',${esPropio})">💾 Guardar</button>`
-  );
-}
-
-function guardarNuevaContrasena(uid,esPropio){
-  const nueva=document.getElementById('cp-nueva')?.value;
-  const confirmar=document.getElementById('cp-confirmar')?.value;
-  if(esPropio){
-    const actual=document.getElementById('cp-actual')?.value;
-    const user=DB.users.find(u=>u.id===uid);
-    if(!actual||user?.password!==actual){toast('La contraseña actual es incorrecta','error');return;}
+function logBit(modulo,accion,detalle){
+  if(!currentUser)return;
+  if(!DB.bitacora)DB.bitacora=[];
+  const ahora=new Date();
+  const fecha=ahora.toLocaleDateString('es-DO',{year:'numeric',month:'2-digit',day:'2-digit'});
+  const hora=ahora.toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  DB.bitacora.unshift({
+    id:uid(),fecha,hora,
+    usuario:currentUser.nombre||currentUser.username||'—',
+    userId:currentUser.id||'',
+    role:currentUser.role||'',
+    modulo:_MOD_LABELS[modulo]||modulo,
+    accion,
+    detalle:(detalle||'').substring(0,120)
+  });
+  if(DB.bitacora.length>500)DB.bitacora=DB.bitacora.slice(0,500);
+  sDB('bitacora');
+  // Sincronizar con Firebase para bitácora centralizada
+  if(typeof fbGuardar==='function'&&window._fbActivo){
+    fbGuardar('bitacora').catch(()=>{});
   }
-  if(!nueva||nueva.length<4){toast('La nueva contraseña debe tener al menos 4 caracteres','error');return;}
+}
+
+function renderBitacora(){
+  if(currentUser?.role!=='admin'){
+    document.getElementById('page-bitacora').innerHTML='<div style="text-align:center;padding:48px"><div style="font-size:48px;margin-bottom:12px">🔒</div><div style="font-size:18px;font-weight:700;color:var(--navy)">Acceso restringido</div><p style="color:var(--gray);margin-top:8px">Solo el administrador puede ver la bitácora.</p></div>';
+    return;
+  }
+  const bits=DB.bitacora||[];
+  const fUsuario=document.getElementById('bit-f-usuario')?.value||'';
+  const fModulo=document.getElementById('bit-f-modulo')?.value||'';
+  const fFecha=document.getElementById('bit-f-fecha')?.value||'';
+  const fBuscar=(document.getElementById('bit-f-buscar')?.value||'').toLowerCase();
+  const lista=bits.filter(b=>{
+    if(fUsuario&&b.usuario!==fUsuario)return false;
+    if(fModulo&&b.modulo!==fModulo)return false;
+    if(fFecha){const [y,m,d]=fFecha.split('-');const fmtFecha=`${d}/${m}/${y}`;if(b.fecha!==fmtFecha)return false;}
+    if(fBuscar&&!(b.accion+b.detalle+b.modulo+b.usuario).toLowerCase().includes(fBuscar))return false;
+    return true;
+  });
+  const usuarios=[...new Set(bits.map(b=>b.usuario))].sort();
+  const modulos=[...new Set(bits.map(b=>b.modulo))].sort();
+  function badgeAccion(a){
+    const l=a.toLowerCase();
+    if(l.includes('inici')&&l.includes('ses'))return'background:#dcfce7;color:#16a34a';
+    if(l.includes('cerr')&&l.includes('ses'))return'background:#fee2e2;color:#dc2626';
+    if(l.includes('elimin')||l.includes('borr'))return'background:#fee2e2;color:#dc2626';
+    if(l.includes('guard')||l.includes('nuevo')||l.includes('regist')||l.includes('creó')||l.includes('agreg'))return'background:#dbeafe;color:#2563eb';
+    if(l.includes('edit')||l.includes('actua')||l.includes('modif'))return'background:#fef3c7;color:#d97706';
+    if(l.includes('pag')||l.includes('abon')||l.includes('cobr'))return'background:#ede9fe;color:#7c3aed';
+    if(l.includes('venta'))return'background:#dcfce7;color:#16a34a';
+    return'background:#f1f5f9;color:#475569';
+  }
+  const filas=lista.length?lista.map(b=>`
+    <tr>
+      <td style="white-space:nowrap;font-size:11px;color:var(--gray)">${b.fecha}</td>
+      <td style="white-space:nowrap;font-size:11px;color:var(--gray)">${b.hora}</td>
+      <td><div style="font-weight:700;font-size:12px">${escHtml(b.usuario)}</div><div style="font-size:10px;color:var(--gray)">${escHtml(b.role||'')}</div></td>
+      <td><span style="background:#f1f5f9;color:#334155;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${escHtml(b.modulo)}</span></td>
+      <td><span style="padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;${badgeAccion(b.accion)}">${escHtml(b.accion)}</span></td>
+      <td style="font-size:12px;color:var(--navy);max-width:260px">${escHtml(b.detalle||'—')}</td>
+    </tr>`).join('')
+    :'<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--gray)">No hay registros con los filtros seleccionados</td></tr>';
+  const usados=Math.round(JSON.stringify(DB.bitacora).length/1024);
+  document.getElementById('page-bitacora').innerHTML=`
+    <div class="page-header">
+      <div>
+        <h1>🔍 Bitácora de Actividad</h1>
+        <p style="color:var(--gray);font-size:13px">${bits.length} registros de ${bits.length>=200?'200 (máximo)':'200 máx'} · ${usados} KB usados · Solo visible para Administrador</p>
+      </div>
+      <button class="btn btn-red btn-sm" onclick="if(confirm('¿Limpiar toda la bitácora? Esta acción no se puede deshacer.')){DB.bitacora=[];sDB('bitacora');renderBitacora();toast('Bitácora limpiada','success')}">🗑 Limpiar todo</button>
+    </div>
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:14px">
+        <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:4px">Usuario</label>
+          <select id="bit-f-usuario" onchange="renderBitacora()" style="width:100%;padding:7px 10px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px">
+            <option value="">Todos</option>
+            ${usuarios.map(u=>`<option value="${escHtml(u)}" ${fUsuario===u?'selected':''}>${escHtml(u)}</option>`).join('')}
+          </select></div>
+        <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:4px">Módulo</label>
+          <select id="bit-f-modulo" onchange="renderBitacora()" style="width:100%;padding:7px 10px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px">
+            <option value="">Todos</option>
+            ${modulos.map(m=>`<option value="${escHtml(m)}" ${fModulo===m?'selected':''}>${escHtml(m)}</option>`).join('')}
+          </select></div>
+        <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:4px">Fecha</label>
+          <input type="date" id="bit-f-fecha" value="${fFecha}" onchange="renderBitacora()" style="width:100%;padding:7px 10px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px"></div>
+        <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:4px">Buscar</label>
+          <input type="text" id="bit-f-buscar" value="${escHtml(fBuscar)}" oninput="renderBitacora()" placeholder="Acción, detalle..." style="width:100%;padding:7px 10px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px"></div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('bit-f-usuario').value='';document.getElementById('bit-f-modulo').value='';document.getElementById('bit-f-fecha').value='';document.getElementById('bit-f-buscar').value='';renderBitacora()">✕ Limpiar</button>
+      </div>
+      <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Mostrando <strong>${lista.length}</strong> de <strong>${bits.length}</strong> registros</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Hora</th><th>Usuario</th><th>Módulo</th><th>Acción</th><th>Detalle</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+/* ═══════════════════════════════════════════ */
+
+function cambiarMiContrasena(){
+  openModal('🔑 Cambiar Mi Contraseña',`
+    <div class="form-field"><label>Contraseña actual</label><input type="password" id="cp-actual" placeholder="Contraseña actual" autocomplete="new-password"></div>
+    <div class="form-field"><label>Nueva contraseña</label><input type="password" id="cp-nueva" placeholder="Nueva contraseña (mínimo 6 caracteres)" autocomplete="new-password"></div>
+    <div class="form-field"><label>Confirmar nueva contraseña</label><input type="password" id="cp-confirmar" placeholder="Repite la nueva contraseña" autocomplete="new-password"></div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+     <button class="btn btn-primary" onclick="guardarCambioContrasena()">💾 Guardar</button>`);
+}
+function guardarCambioContrasena(){
+  const actual=document.getElementById('cp-actual').value;
+  const nueva=document.getElementById('cp-nueva').value;
+  const confirmar=document.getElementById('cp-confirmar').value;
+  const i=DB.users.findIndex(u=>u.id===currentUser.id);
+  if(i<0){toast('Usuario no encontrado','error');return;}
+  if(DB.users[i].password!==actual){toast('La contraseña actual es incorrecta','error');return;}
+  if(!nueva||nueva.length<6){toast('La nueva contraseña debe tener al menos 6 caracteres','error');return;}
   if(nueva!==confirmar){toast('Las contraseñas no coinciden','error');return;}
-  const i=DB.users.findIndex(u=>u.id===uid);
-  if(i<0)return;
   DB.users[i].password=nueva;
-  if(currentUser.id===uid)currentUser.password=nueva;
+  currentUser.password=nueva;
   sDB('users');
   closeModal();
-  toast('Contraseña actualizada ✓','success');
+  toast('Contraseña actualizada correctamente ✓','success');
 }
-// ══════════════════════════════════════════════════════════════════════════
-
 function doLogout(){
   if(currentUser){
     logBit('Sesión','Cerró sesión','—');
@@ -787,12 +998,6 @@ function doLogout(){
 /* ═══════════════════════════════════════════
    BITÁCORA DE ACTIVIDAD — máx 200 entradas
 ═══════════════════════════════════════════ */
-const _MOD_LABELS={dashboard:'Inicio',inventario:'Reg. Vehículo',gastosVeh:'Gastos Vehículo',
-  cxp:'Cuentas x Pagar',clientes:'Clientes',ventas:'Ventas',cxc:'Cuentas x Cobrar',
-  gastos:'Gastos Empresa',nomina:'Nómina',caja:'Caja',cotizaciones:'Cotizaciones',
-  autorizaciones:'Autorización',seguros:'Seguros',facturaExterna:'Facturas Ext.',
-  suplidores:'Suplidores',informes:'Informes',usuarios:'Usuarios',config:'Configuración',
-  cuentasBancarias:'Cuentas',backup:'Backup',bitacora:'Bitácora',alertas:'Alertas',chat:'Chat',prestamos:'Préstamos'};
 
 function logBit(modulo,accion,detalle){
   if(!currentUser)return;
@@ -5811,7 +6016,7 @@ function nuevaVenta(){
       </div>
 
       <!-- PASO 3a: Detalles Endoso -->
-      <div id="sv-endoso-wrap" style="display:none">
+      <div id="sv-endoso-wrap">
         <div class="form-row c2" style="margin-bottom:8px">
           <div class="form-field" style="margin:0">
             <label style="font-size:10px;font-weight:700">💰 Costo del Endoso</label>
@@ -5897,13 +6102,7 @@ function nuevaVenta(){
     </div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
      <button class="btn btn-green" onclick="confirmarVenta('${nf}')">✅ Confirmar Venta</button>`);
-  // Activar Endorso por defecto al abrir el modal
-  const _activarEndoso=()=>{
-    const btn=document.getElementById('sv-btn-endoso');
-    if(btn){svSelTitulacion('endoso');}
-    else{setTimeout(_activarEndoso,50);}
-  };
-  setTimeout(_activarEndoso,100);
+  setTimeout(()=>svSelTitulacion('endoso'),100);
 }
 
 let ventaSelectedId=null;
@@ -6141,15 +6340,15 @@ function svSelTitulacion(tipo){
   // Activar seleccionado
   if(tipo==='endoso'){
     if(btnEndoso)btnEndoso.style.cssText='flex:1;min-width:100px;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;'+activeStyle;
-    if(endosoWrap)endosoWrap.style.display='block';
+    if(endosoWrap)endosoWrap.style.display='';
     if(traspasoWrap)traspasoWrap.style.display='none';
-    if(gestorWrap)gestorWrap.style.display='block';
+    if(gestorWrap)gestorWrap.style.display='';
     if(tipoInput)tipoInput.value='endoso';
   } else if(tipo==='traspaso'){
     if(btnTraspaso)btnTraspaso.style.cssText='flex:1;min-width:100px;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;'+activeStyle;
     if(endosoWrap)endosoWrap.style.display='none';
-    if(traspasoWrap)traspasoWrap.style.display='block';
-    if(gestorWrap)gestorWrap.style.display='block';
+    if(traspasoWrap)traspasoWrap.style.display='';
+    if(gestorWrap)gestorWrap.style.display='';
     if(tipoInput)tipoInput.value='traspaso';
     toggleTraspasoFields();
   } else {
@@ -10433,93 +10632,7 @@ function aplicarColoresSistema(){
 //  FUNCIONES TRASPLANTADAS DE MAEDIG
 // ═══════════════════════════════════════════════════
 
-const MENU_DEFS=[
-  {id:'dashboard',   sec:'PRINCIPAL', ico:'🏠', label:'Inicio'},
-  {id:'informes',    sec:'PRINCIPAL', ico:'📊', label:'Informe Mensual'},
-  {id:'suplidores',  sec:'VEHÍCULOS', ico:'🏭', label:'Suplidores'},
-  {id:'inventario',  sec:'VEHÍCULOS', ico:'🚗', label:'Registro de Vehículo'},
-  {id:'gastosVeh',   sec:'VEHÍCULOS', ico:'💸', label:'Gastos de Vehículo'},
-  {id:'cxp',         sec:'VEHÍCULOS', ico:'📑', label:'Cuentas por Pagar'},
-  {id:'clientes',    sec:'CLIENTES',  ico:'👤', label:'Clientes'},
-  {id:'ventas',      sec:'CLIENTES',  ico:'💰', label:'Ventas'},
-  {id:'cxc',         sec:'CLIENTES',  ico:'📬', label:'Cuentas por Cobrar'},
-  {id:'gastos',      sec:'FINANZAS',  ico:'🏢', label:'Gastos Empresa'},
-  {id:'nomina',      sec:'FINANZAS',  ico:'👷', label:'Nómina'},
-  {id:'caja',        sec:'FINANZAS',  ico:'💳', label:'Caja'},
-  {id:'cotizaciones',sec:'OTROS',     ico:'📋', label:'Cotizaciones'},
-  {id:'autorizaciones',sec:'OTROS',   ico:'📝', label:'Autorización Compra'},
-  {id:'seguros',     sec:'OTROS',     ico:'🛡️', label:'Seguros'},
-  {id:'facturaExterna',sec:'OTROS',   ico:'🧾', label:'Facturas Externas'},
-  {id:'chat',        sec:'OTROS',     ico:'💬', label:'Chat Interno'},
-  {id:'prestamos',   sec:'SISTEMA',   ico:'🏛️', label:'Préstamos'},
-  {id:'cuentas',     sec:'SISTEMA',   ico:'🏦', label:'Cuentas'},
-  {id:'cumpleanos',  sec:'SISTEMA',   ico:'🎂', label:'Cumpleaños'},
-  {id:'alertas',     sec:'SISTEMA',   ico:'🔔', label:'Alertas del Sistema'},
-  {id:'usuarios',    sec:'SISTEMA',   ico:'👥', label:'Usuarios'},
-  {id:'config',      sec:'SISTEMA',   ico:'⚙️', label:'Configuración'},
-];
 
-const CAMPOS_MODULOS={
-  inventario:[
-    {id:'vin',        label:'Número de Chasis / VIN'},
-    {id:'placa',      label:'Placa del Vehículo'},
-    {id:'color',      label:'Color'},
-    {id:'motor',      label:'Número de Motor'},
-    {id:'anio',       label:'Año del Vehículo'},
-    {id:'costo',      label:'Costo de Compra'},
-    {id:'suplidor',   label:'Suplidor / Proveedor'},
-    {id:'tipoCompra', label:'Tipo de Compra'},
-  ],
-  ventas:[
-    {id:'cliente',    label:'Cliente'},
-    {id:'precio',     label:'Precio de Venta'},
-    {id:'metodoPago', label:'Método de Pago'},
-    {id:'fecha',      label:'Fecha de Venta'},
-    {id:'inicial',    label:'Inicial / Abono'},
-    {id:'gestor',     label:'Gestor de Transferencia'},
-    {id:'fechaEntrega',label:'Fecha de Entrega'},
-  ],
-  clientes:[
-    {id:'telefono',   label:'Teléfono / Celular'},
-    {id:'documento',  label:'Cédula / Documento'},
-    {id:'ciudad',     label:'Ciudad'},
-    {id:'direccion',  label:'Dirección'},
-    {id:'ingresos',   label:'Ingresos Mensuales'},
-    {id:'cumpleanos', label:'Fecha de Cumpleaños'},
-  ],
-  gastosVeh:[
-    {id:'suplidor',   label:'Suplidor'},
-    {id:'nroFactura', label:'Número de Factura'},
-    {id:'fechaPago',  label:'Fecha de Pago'},
-    {id:'banco',      label:'Banco / Cuenta'},
-  ],
-  gastos:[
-    {id:'suplidor',   label:'Suplidor'},
-    {id:'nroFactura', label:'Número de Factura'},
-    {id:'fechaLimite',label:'Fecha Límite de Pago'},
-    {id:'banco',      label:'Banco / Cuenta'},
-  ],
-  nomina:[
-    {id:'cedula',     label:'Cédula del Empleado'},
-    {id:'banco',      label:'Banco para Pago'},
-    {id:'numeroCuenta',label:'Número de Cuenta Bancaria'},
-    {id:'cargo',      label:'Cargo / Puesto'},
-  ],
-  cxc:[
-    {id:'fechaVence', label:'Fecha de Vencimiento'},
-    {id:'banco',      label:'Banco / Cuenta de Cobro'},
-  ],
-  seguros:[
-    {id:'poliza',     label:'Número de Póliza'},
-    {id:'vencimiento',label:'Fecha de Vencimiento'},
-    {id:'banco',      label:'Banco / Cuenta de Pago'},
-  ],
-  prestamos:[
-    {id:'entidad',    label:'Banco / Entidad Prestamista'},
-    {id:'tasa',       label:'Tasa de Interés'},
-    {id:'notas',      label:'Notas / Referencia Contrato'},
-  ],
-};
 
 
 
@@ -12224,6 +12337,15 @@ window.fbIniciar = async function(){
 };
 // Arrancar — todo está definido aquí
 _iniciarConFirebase();
+// Ocultar welcome si no hay usuario tras 15 seg
+setTimeout(()=>{
+  const ws=document.getElementById('welcome-screen');
+  if(ws&&!ws.classList.contains('hidden')&&!window.currentUser){
+    ws.classList.remove('show');
+    const ls=document.getElementById('login-screen');
+    if(ls)ls.style.display='flex';
+  }
+},15000);
 </script>
 
 <script>

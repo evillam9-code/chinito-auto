@@ -12193,8 +12193,10 @@ function _verificarBackupAdmin(){
   const fechaHoy=hoy.toISOString().slice(0,10);
   const lastBackupFecha=(DB.config._lastBackup||'').slice(0,10);
   if(lastBackupFecha===fechaHoy)return;
-  // Ejecutar backup directamente con los datos ya en DB — sin recargar Firebase
-  setTimeout(()=>{ _ejecutarBackupAuto(); },4000);
+  setTimeout(()=>{
+    if(!window._fbActivo||!window._fbCargado)return;
+    fbCargar().then(()=>{_ejecutarBackupAuto();}).catch(()=>{_ejecutarBackupAuto();});
+  },4000);
 }
 
 // ══ ALERTA CUMPLEAÑOS DEL DÍA ══
@@ -12365,11 +12367,6 @@ function fbActivarListeners(){
     'ventas','cotizaciones','caja','gastos','nomina','nominaPagos',
     'gastosVehiculos','cxp','cxc','autorizaciones','presencia','chat'];
   
-  // NO bloquear con timeout — simplemente nunca re-renderizar desde listeners
-  // Los listeners solo actualizan DB silenciosamente
-  // El re-render ocurre cuando el usuario navega a otra página
-  window._fbListenersActivos = true;
-
   keys.forEach(key=>{
     _fbDB.collection(_fbCol).doc(key).onSnapshot(snap=>{
       if(!snap.exists||!window._fbActivo)return;
@@ -12382,13 +12379,17 @@ function fbActivarListeners(){
           const merged=[...val];
           (DB.users||[]).forEach(lu=>{
             if(!merged.find(u=>u.id===lu.id))merged.push(lu);
+            // Si el usuario YA existe en Firebase, Firebase gana — no mezclar datos viejos
           });
           DB.users=merged.length>0?merged:DB.users;
+          // Actualizar localStorage para mantener sync
           try{localStorage.setItem('chinito_users',JSON.stringify(DB.users));}catch{}
+          // Fix 3 — detectar cambios de permisos/módulos del usuario activo en tiempo real
           if(window.currentUser){
             const updatedMe=DB.users.find(u=>u.id===window.currentUser.id);
             if(updatedMe){
               if(updatedMe.activo===false){
+                // Admin desactivó este usuario — cerrar sesión
                 if(typeof doLogout==='function') doLogout();
               } else {
                 const changed=
@@ -12407,14 +12408,17 @@ function fbActivarListeners(){
             }
           }
         } else if(key==='presencia'&&typeof val==='object'&&val!==null){
+          // Merge presencia remota con local
           DB.presencia=Object.assign(DB.presencia||{},val);
+          // Escribir en localStorage para coherencia local
           localStorage.setItem('chinito_presencia',JSON.stringify(DB.presencia));
+          // Refrescar tabla de usuarios si está activa (sin afectar otras páginas)
           const pU=document.getElementById('page-usuarios');
           if(pU&&pU.classList.contains('active')){
             clearTimeout(window._presenciaRefreshTimer);
             window._presenciaRefreshTimer=setTimeout(_actualizarBadgesOnlineUsuarios,300);
           }
-          return;
+          return; // No ejecutar el renderMap genérico
         } else if(key==='config_logo'){
           const logoVal=typeof val==='string'?val:(val&&val.logoData?val.logoData:'');
           if(logoVal&&logoVal.startsWith('data:')){
@@ -12422,29 +12426,79 @@ function fbActivarListeners(){
             DB.config.logoData=logoVal;
             if(typeof actualizarLogoSidebar==='function')actualizarLogoSidebar();
           }
-          return; // config_logo nunca re-renderiza páginas
         } else if(key==='config'&&typeof val==='object'&&val!==null){
           const merged=Object.assign({},DB.config);
           Object.keys(val).forEach(k=>{
             if(val[k]!==null&&val[k]!==undefined&&val[k]!=='')merged[k]=val[k];
           });
           DB.config=merged;
+          // Actualizar topbar y sidebar
           const empEl=document.getElementById('topbar-empresa');
           if(empEl&&DB.config.empresa)empEl.textContent=DB.config.empresa;
           if(typeof actualizarLogoSidebar==='function')actualizarLogoSidebar();
           if(typeof aplicarColoresSistema==='function'&&DB.config.colores)aplicarColoresSistema();
-          return; // config solo actualiza UI, no re-renderiza páginas
         } else {
           DB[key]=val;
         }
-        // Actualizar DB silenciosamente — sin re-renderizar
-        // El render ocurre cuando el usuario navega manualmente
+        // Re-renderizar la página activa si corresponde
+        const activePage=document.querySelector('.page.active');
+        if(!activePage)return;
+        const pid=activePage.id.replace('page-','');
+        const renderMap={
+          dashboard:()=>typeof renderDashboard==='function'&&renderDashboard(),
+          inventario:()=>typeof renderInventario==='function'&&renderInventario(),
+          ventas:()=>typeof renderVentas==='function'&&renderVentas(),
+          clientes:()=>typeof renderClientes==='function'&&renderClientes(),
+          suplidores:()=>typeof renderSuplidores==='function'&&renderSuplidores(),
+          gastos:()=>typeof renderGastos==='function'&&renderGastos(),
+          nomina:()=>typeof renderNomina==='function'&&renderNomina(),
+          cxc:()=>typeof renderCXC==='function'&&renderCXC(),
+          cxp:()=>typeof renderCXP==='function'&&renderCXP(),
+          caja:()=>typeof renderCaja==='function'&&renderCaja(),
+          gastosVeh:()=>typeof renderGastosVeh==='function'&&renderGastosVeh(),
+          cotizaciones:()=>typeof renderCotizaciones==='function'&&renderCotizaciones(),
+          autorizaciones:()=>typeof renderAutorizaciones==='function'&&renderAutorizaciones(),
+          usuarios:()=>typeof renderUsuarios==='function'&&renderUsuarios(),
+          config:()=>typeof renderConfig==='function'&&renderConfig(),
+          informes:()=>typeof renderInformes==='function'&&renderInformes(),
+        };
+        // Solo re-renderizar si el key afecta la página activa
+        const keysParaPagina={
+          dashboard:['vehiculos','ventas','cxc','cxp','gastos','config'],
+          inventario:['vehiculos'],ventas:['ventas','clientes'],
+          clientes:['clientes'],suplidores:['suplidores'],
+          gastos:['gastos'],nomina:['nomina','nominaPagos'],
+          cxc:['cxc','vehiculos'],cxp:['gastosVehiculos','cxp','vehiculos'],
+          caja:['caja'],gastosVeh:['gastosVehiculos','vehiculos'],
+          cotizaciones:['cotizaciones','clientes'],
+          autorizaciones:['autorizaciones'],
+          usuarios:['users','presencia'],config:[],
+          informes:['ventas','gastos','cxc','gastosVehiculos','nomina'],
+          chat:['chat'],
+        };
+        // Chat: actualizar mensajes en tiempo real sin re-renderizar todo
+        if(key==='chat'){
+          _chatActualizarBadge();
+          if(pid==='chat'){
+            const msgsDiv=document.getElementById('chat-messages');
+            if(msgsDiv&&typeof _renderMensajes==='function'){
+              msgsDiv.innerHTML=_renderMensajes();
+              if(typeof _chatScrollBottom==='function')_chatScrollBottom();
+            }
+          }
+          return;
+        }
+        const afecta=keysParaPagina[pid]||[];
+        if(afecta.includes(key)&&renderMap[pid]){
+          // Pequeño delay para evitar re-renders en cascada
+          clearTimeout(window._renderTimeout);
+          window._renderTimeout=setTimeout(renderMap[pid],300);
+        }
       }catch(e){console.warn('FB listener error:',key,e.message);}
     });
   });
   console.log('✅ Firebase listeners activos — tiempo real habilitado');
 }
-
 window.forzarSincronizacion = async function(){
   if(!window._fbActivo){toast('Firebase no está conectado','error');return;}
   const keys=['config','users','vehiculos','clientes','suplidores','ventas','cotizaciones',
@@ -12486,14 +12540,24 @@ window.fbIniciar = async function(){
     if(loaded){
       setStatus('#22c55e','✓ Firebase');
       window._fbCargado=true;
-      // Activar listeners con delay para no interrumpir el render inicial
-      setTimeout(()=>{
-        if(typeof fbActivarListeners==='function') fbActivarListeners();
-      },3000);
+      if(typeof fbActivarListeners==='function') fbActivarListeners();
       if(typeof actualizarLogoSidebar==='function') actualizarLogoSidebar();
       const _empFb=document.getElementById('topbar-empresa');
       if(_empFb&&DB.config.empresa)_empFb.textContent=DB.config.empresa;
       if(typeof aplicarColoresSistema==='function'&&DB.config.colores)aplicarColoresSistema();
+      const _activePage=document.querySelector('.page.active');
+      if(_activePage){
+        const _pid=_activePage.id.replace('page-','');
+        const _renderMap={
+          dashboard:renderDashboard,inventario:renderInventario,
+          gastosVeh:renderGastosVeh,cxp:renderCXP,cxc:renderCXC,
+          ventas:renderVentas,clientes:renderClientes,suplidores:renderSuplidores,
+          gastos:renderGastos,nomina:renderNomina,caja:renderCaja,
+          cotizaciones:renderCotizaciones,autorizaciones:renderAutorizaciones,
+          usuarios:renderUsuarios,config:renderConfig,informes:renderInformes
+        };
+        if(_renderMap[_pid])setTimeout(_renderMap[_pid],300);
+      }
     } else {
       // Fix 4B — solo subir si hay datos reales, no sobreescribir Firebase con vacío
       const hayDatosReales=

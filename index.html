@@ -26,8 +26,8 @@ body{font-family:'Outfit',sans-serif;background:var(--gray2);color:var(--navy);f
 .btn-login:disabled{background:#94a3b8;cursor:not-allowed;box-shadow:none}
 .login-blocked{display:none;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:20px;text-align:center}
 /* PANTALLA BIENVENIDA */
-#welcome-screen{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);align-items:center;justify-content:center;flex-direction:column;text-align:center}
-#welcome-screen.show{display:flex}
+#welcome-screen{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);align-items:center;justify-content:center;flex-direction:column;text-align:center;pointer-events:none}
+#welcome-screen.show{display:flex;pointer-events:all}
 .wc-inner{animation:wFadeIn .8s ease forwards}
 @keyframes wFadeIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
 .wc-title{font-size:42px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:8px}
@@ -309,7 +309,7 @@ select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 
     <div class="nav-item" onclick="showPage('facturaExterna')" id="nav-facturaExterna"><span class="ico">🧾</span>Facturas Externas</div>
     <div class="nav-item" onclick="showPage('chat')" id="nav-chat"><span class="ico">💬</span>Chat Interno <span id="chat-badge" style="display:none;background:#dc2626;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto">0</span></div>
     <div class="sb-sec">SISTEMA</div>
-    <div class="nav-item" onclick="showPage('prestamos')" id="nav-prestamos"><span class="ico">🏛️</span>Préstamos Bancos</div>
+    <div class="nav-item" onclick="showPage('prestamos')" id="nav-prestamos"><span class="ico">🏛️</span>Préstamos</div>
     <div class="nav-item" onclick="showPage('usuarios')" id="nav-usuarios"><span class="ico">👥</span>Usuarios</div>
     <div class="nav-item" onclick="showPage('alertas')" id="nav-alertas"><span class="ico">🔔</span>Alertas del Sistema</div>
     <div class="nav-item" onclick="showPage('cuentasBancarias')" id="nav-cuentasBancarias"><span class="ico">🏦</span>Cuentas Bancarias</div>
@@ -614,7 +614,7 @@ function doLogin(){
     } else {
       if(wcLogoImg)wcLogoImg.style.display='none';
       if(wcLogoWrap)wcLogoWrap.style.display='none';
-      if(wcLogoFallback)wcLogoFallback.style.display='none';
+      if(wcLogoFallback)wcLogoFallback.style.display='block';
       if(wcTitle){
         wcTitle.style.display='block';
         wcTitle.innerHTML=nombreEmpresa
@@ -653,10 +653,6 @@ function doLogin(){
         }
       },3000);
     }
-    // Activar listeners DESPUÉS del render del dashboard
-    setTimeout(()=>{
-      if(window._fbActivo&&typeof fbActivarListeners==='function') fbActivarListeners();
-    },1500);
   };
   // Mostrar bienvenida con datos del localStorage primero
   _actualizarWelcome();
@@ -666,6 +662,7 @@ function doLogin(){
     _actualizarWelcome();
     setTimeout(_entrarDashboard, 2000);
   } else if(typeof fbIniciar==='function'){
+    // Firebase aún no cargó, cargar ahora
     let _localFbCargado=false;
     const _fbTimeout=setTimeout(()=>{
       if(!_localFbCargado) _entrarDashboard();
@@ -704,294 +701,75 @@ function canDo(action){
   if(rolesAdmin.some(r=>currentUser.role?.toLowerCase()===r.toLowerCase()))return true;
   return (currentUser.permisos||{})[action]===true;
 }
-// ── Orden del menú lateral ─────────────────────────────
-// Definición completa de módulos con sección y etiqueta
-const MENU_DEFS=[
-  {id:'dashboard',   sec:'PRINCIPAL', ico:'🏠', label:'Inicio'},
-  {id:'informes',    sec:'PRINCIPAL', ico:'📊', label:'Informe Mensual'},
-  {id:'suplidores',  sec:'VEHÍCULOS', ico:'🏭', label:'Suplidores'},
-  {id:'inventario',  sec:'VEHÍCULOS', ico:'🚗', label:'Registro de Vehículo'},
-  {id:'gastosVeh',   sec:'VEHÍCULOS', ico:'💸', label:'Gastos de Vehículo'},
-  {id:'cxp',         sec:'VEHÍCULOS', ico:'📑', label:'Cuentas por Pagar'},
-  {id:'clientes',    sec:'CLIENTES',  ico:'👤', label:'Clientes'},
-  {id:'ventas',      sec:'CLIENTES',  ico:'💰', label:'Ventas'},
-  {id:'cxc',         sec:'CLIENTES',  ico:'📬', label:'Cuentas por Cobrar'},
-  {id:'gastos',      sec:'FINANZAS',  ico:'🏢', label:'Gastos Empresa'},
-  {id:'nomina',      sec:'FINANZAS',  ico:'👷', label:'Nómina'},
-  {id:'caja',        sec:'FINANZAS',  ico:'💳', label:'Caja'},
-  {id:'cotizaciones',sec:'OTROS',     ico:'📋', label:'Cotizaciones'},
-  {id:'autorizaciones',sec:'OTROS',   ico:'📝', label:'Autorización Compra'},
-  {id:'seguros',     sec:'OTROS',     ico:'🛡️', label:'Seguros'},
-  {id:'facturaExterna',sec:'OTROS',   ico:'🧾', label:'Facturas Externas'},
-  {id:'chat',        sec:'OTROS',     ico:'💬', label:'Chat Interno'},
-  {id:'prestamos',   sec:'SISTEMA',   ico:'🏛️', label:'Préstamos Bancos'},
-  {id:'cuentas',     sec:'SISTEMA',   ico:'🏦', label:'Cuentas'},
-  {id:'cumpleanos',  sec:'SISTEMA',   ico:'🎂', label:'Cumpleaños'},
-  {id:'alertas',     sec:'SISTEMA',   ico:'🔔', label:'Alertas del Sistema'},
-  {id:'usuarios',    sec:'SISTEMA',   ico:'👥', label:'Usuarios'},
-  {id:'config',      sec:'SISTEMA',   ico:'⚙️', label:'Configuración'},
-];
-
-// ── Sistema de Campos Requeridos ─────────────────────────
-const CAMPOS_MODULOS={
-  inventario:[
-    {id:'vin',        label:'Número de Chasis / VIN'},
-    {id:'placa',      label:'Placa del Vehículo'},
-    {id:'color',      label:'Color'},
-    {id:'motor',      label:'Número de Motor'},
-    {id:'anio',       label:'Año del Vehículo'},
-    {id:'costo',      label:'Costo de Compra'},
-    {id:'suplidor',   label:'Suplidor / Proveedor'},
-    {id:'tipoCompra', label:'Tipo de Compra'},
-  ],
-  ventas:[
-    {id:'cliente',    label:'Cliente'},
-    {id:'precio',     label:'Precio de Venta'},
-    {id:'metodoPago', label:'Método de Pago'},
-    {id:'fecha',      label:'Fecha de Venta'},
-    {id:'inicial',    label:'Inicial / Abono'},
-    {id:'gestor',     label:'Gestor de Transferencia'},
-    {id:'fechaEntrega',label:'Fecha de Entrega'},
-  ],
-  clientes:[
-    {id:'telefono',   label:'Teléfono / Celular'},
-    {id:'documento',  label:'Cédula / Documento'},
-    {id:'ciudad',     label:'Ciudad'},
-    {id:'direccion',  label:'Dirección'},
-    {id:'ingresos',   label:'Ingresos Mensuales'},
-    {id:'cumpleanos', label:'Fecha de Cumpleaños'},
-  ],
-  gastosVeh:[
-    {id:'suplidor',   label:'Suplidor'},
-    {id:'nroFactura', label:'Número de Factura'},
-    {id:'fechaPago',  label:'Fecha de Pago'},
-    {id:'banco',      label:'Banco / Cuenta'},
-  ],
-  gastos:[
-    {id:'suplidor',   label:'Suplidor'},
-    {id:'nroFactura', label:'Número de Factura'},
-    {id:'fechaLimite',label:'Fecha Límite de Pago'},
-    {id:'banco',      label:'Banco / Cuenta'},
-  ],
-  nomina:[
-    {id:'cedula',     label:'Cédula del Empleado'},
-    {id:'banco',      label:'Banco para Pago'},
-    {id:'numeroCuenta',label:'Número de Cuenta Bancaria'},
-    {id:'cargo',      label:'Cargo / Puesto'},
-  ],
-  cxc:[
-    {id:'fechaVence', label:'Fecha de Vencimiento'},
-    {id:'banco',      label:'Banco / Cuenta de Cobro'},
-  ],
-  seguros:[
-    {id:'poliza',     label:'Número de Póliza'},
-    {id:'vencimiento',label:'Fecha de Vencimiento'},
-    {id:'banco',      label:'Banco / Cuenta de Pago'},
-  ],
-  prestamos:[
-    {id:'entidad',    label:'Banco / Entidad Prestamista'},
-    {id:'tasa',       label:'Tasa de Interés'},
-    {id:'notas',      label:'Notas / Referencia Contrato'},
-  ],
-};
-
-// Verificar si un campo es requerido para un módulo
-function isRequired(modulo, campoId){
-  const cfg=DB.config.camposRequeridos||{};
-  // Si no está configurado, usar defaults (los que ya tienen class="required" en HTML)
-  if(!cfg[modulo])return false;
-  return cfg[modulo].includes(campoId);
-}
-
-// Verificar campos requeridos antes de guardar
-function validarCamposRequeridos(modulo, datos){
-  const cfg=DB.config.camposRequeridos||{};
-  const requeridos=cfg[modulo]||[];
-  const faltantes=[];
-  const defs=CAMPOS_MODULOS[modulo]||[];
-  requeridos.forEach(campoId=>{
-    const def=defs.find(d=>d.id===campoId);
-    const label=def?def.label:campoId;
-    const val=datos[campoId];
-    if(!val||String(val).trim()===''){
-      faltantes.push(label);
-    }
-  });
-  if(faltantes.length>0){
-    toast('Campos requeridos faltantes: '+faltantes.join(', '),'error');
-    return false;
-  }
-  return true;
-}
-
-function aplicarOrdenMenu(){
-  const orden=DB.config.menuOrden||[];
-  if(!orden.length)return; // sin personalización, usar orden HTML original
-  const sidebar=document.getElementById('sidebar');
-  if(!sidebar)return;
-  // Reconstruir nav-items en el orden guardado
-  // Solo reordenamos los nav-item, no tocamos secciones sb-sec ni el footer
-  orden.forEach(id=>{
-    const el=document.getElementById('nav-'+id);
-    if(el)sidebar.appendChild(el);
-  });
-}
-
 function aplicarPermisosNav(){
   if(!currentUser)return;
   // Ocultar nav-items de módulos sin acceso
   const MODS_NAV=['dashboard','informes','suplidores','inventario','gastosVeh','cxp',
-    'clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','usuarios','config','cuentas','cumpleanos','backup','prestamos'];
+    'clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','usuarios','cuentasBancarias','config','cumpleanos','prestamos'];
   MODS_NAV.forEach(id=>{
     const nav=document.getElementById('nav-'+id);
     if(!nav)return;
-    // Admin ve todo, otros solo lo que tienen asignado
     const tiene=currentUser.role==='admin'||canAccess(id);
     nav.style.display=tiene?'':'none';
   });
   // Backup solo para admin
-  const backupBtn=document.getElementById('nav-backup');
-  if(backupBtn)backupBtn.style.display=currentUser?.role==='admin'?'flex':'none';
+  const nbk=document.getElementById('nav-backup');
+  if(nbk)nbk.style.display=currentUser.role==='admin'?'':'none';
   const nbit=document.getElementById('nav-bitacora');
-  if(nbit)nbit.style.display=currentUser?.role==='admin'?'flex':'none';
-  // Informe Semanal solo para admin
-  const nInfSem=document.getElementById('nav-informeSemanal');
-  if(nInfSem)nInfSem.style.display=currentUser?.role==='admin'?'flex':'none';
-}
-/* ═══════════════════════════════════════════
-   BITÁCORA DE ACTIVIDAD — máx 200 entradas
-═══════════════════════════════════════════ */
-const _MOD_LABELS={dashboard:'Inicio',inventario:'Reg. Vehículo',gastosVeh:'Gastos Vehículo',
-  cxp:'Cuentas x Pagar',clientes:'Clientes',ventas:'Ventas',cxc:'Cuentas x Cobrar',
-  gastos:'Gastos Empresa',nomina:'Nómina',caja:'Caja',cotizaciones:'Cotizaciones',
-  autorizaciones:'Autorización',seguros:'Seguros',facturaExterna:'Facturas Ext.',
-  suplidores:'Suplidores',informes:'Informes',usuarios:'Usuarios',config:'Configuración',
-  cuentas:'Cuentas',backup:'Backup',bitacora:'Bitácora',alertas:'Alertas',chat:'Chat',prestamos:'Préstamos Bancos'};
-
-function logBit(modulo,accion,detalle){
-  if(!currentUser)return;
-  if(!DB.bitacora)DB.bitacora=[];
-  const ahora=new Date();
-  const fecha=ahora.toLocaleDateString('es-DO',{year:'numeric',month:'2-digit',day:'2-digit'});
-  const hora=ahora.toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  DB.bitacora.unshift({
-    id:uid(),fecha,hora,
-    usuario:currentUser.nombre||currentUser.username||'—',
-    userId:currentUser.id||'',
-    role:currentUser.role||'',
-    modulo:_MOD_LABELS[modulo]||modulo,
-    accion,
-    detalle:(detalle||'').substring(0,120)
-  });
-  if(DB.bitacora.length>500)DB.bitacora=DB.bitacora.slice(0,500);
-  sDB('bitacora');
-  // Sincronizar con Firebase para bitácora centralizada
-  if(typeof fbGuardar==='function'&&window._fbActivo){
-    fbGuardar('bitacora').catch(()=>{});
-  }
+  if(nbit)nbit.style.display=currentUser.role==='admin'?'':'none';
 }
 
-function renderBitacora(){
-  if(currentUser?.role!=='admin'){
-    document.getElementById('page-bitacora').innerHTML='<div style="text-align:center;padding:48px"><div style="font-size:48px;margin-bottom:12px">🔒</div><div style="font-size:18px;font-weight:700;color:var(--navy)">Acceso restringido</div><p style="color:var(--gray);margin-top:8px">Solo el administrador puede ver la bitácora.</p></div>';
-    return;
-  }
-  const bits=DB.bitacora||[];
-  const fUsuario=document.getElementById('bit-f-usuario')?.value||'';
-  const fModulo=document.getElementById('bit-f-modulo')?.value||'';
-  const fFecha=document.getElementById('bit-f-fecha')?.value||'';
-  const fBuscar=(document.getElementById('bit-f-buscar')?.value||'').toLowerCase();
-  const lista=bits.filter(b=>{
-    if(fUsuario&&b.usuario!==fUsuario)return false;
-    if(fModulo&&b.modulo!==fModulo)return false;
-    if(fFecha){const [y,m,d]=fFecha.split('-');const fmtFecha=`${d}/${m}/${y}`;if(b.fecha!==fmtFecha)return false;}
-    if(fBuscar&&!(b.accion+b.detalle+b.modulo+b.usuario).toLowerCase().includes(fBuscar))return false;
-    return true;
-  });
-  const usuarios=[...new Set(bits.map(b=>b.usuario))].sort();
-  const modulos=[...new Set(bits.map(b=>b.modulo))].sort();
-  function badgeAccion(a){
-    const l=a.toLowerCase();
-    if(l.includes('inici')&&l.includes('ses'))return'background:#dcfce7;color:#16a34a';
-    if(l.includes('cerr')&&l.includes('ses'))return'background:#fee2e2;color:#dc2626';
-    if(l.includes('elimin')||l.includes('borr'))return'background:#fee2e2;color:#dc2626';
-    if(l.includes('guard')||l.includes('nuevo')||l.includes('regist')||l.includes('creó')||l.includes('agreg'))return'background:#dbeafe;color:#2563eb';
-    if(l.includes('edit')||l.includes('actua')||l.includes('modif'))return'background:#fef3c7;color:#d97706';
-    if(l.includes('pag')||l.includes('abon')||l.includes('cobr'))return'background:#ede9fe;color:#7c3aed';
-    if(l.includes('venta'))return'background:#dcfce7;color:#16a34a';
-    return'background:#f1f5f9;color:#475569';
-  }
-  const filas=lista.length?lista.map(b=>`
-    <tr>
-      <td style="white-space:nowrap;font-size:11px;color:var(--gray)">${b.fecha}</td>
-      <td style="white-space:nowrap;font-size:11px;color:var(--gray)">${b.hora}</td>
-      <td><div style="font-weight:700;font-size:12px">${escHtml(b.usuario)}</div><div style="font-size:10px;color:var(--gray)">${escHtml(b.role||'')}</div></td>
-      <td><span style="background:#f1f5f9;color:#334155;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${escHtml(b.modulo)}</span></td>
-      <td><span style="padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;${badgeAccion(b.accion)}">${escHtml(b.accion)}</span></td>
-      <td style="font-size:12px;color:var(--navy);max-width:260px">${escHtml(b.detalle||'—')}</td>
-    </tr>`).join('')
-    :'<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--gray)">No hay registros con los filtros seleccionados</td></tr>';
-  const usados=Math.round(JSON.stringify(DB.bitacora).length/1024);
-  document.getElementById('page-bitacora').innerHTML=`
-    <div class="page-header">
-      <div>
-        <h1>🔍 Bitácora de Actividad</h1>
-        <p style="color:var(--gray);font-size:13px">${bits.length} registros de ${bits.length>=200?'200 (máximo)':'200 máx'} · ${usados} KB usados · Solo visible para Administrador</p>
+// ══ CAMBIO DE CONTRASEÑA ══════════════════════════════════════════════════
+function abrirCambiarContrasena(userId){
+  // Si se pasa userId, es el admin reseteando la de otro usuario
+  const targetUser=userId?DB.users.find(u=>u.id===userId):currentUser;
+  if(!targetUser)return;
+  const esPropio=!userId||userId===currentUser.id;
+  const titulo=esPropio?'🔑 Cambiar mi contraseña':'🔑 Resetear contraseña — '+escHtml(targetUser.nombre);
+  openModal(titulo,`
+    <div style="margin-bottom:16px">
+      <div style="font-size:13px;color:var(--gray);margin-bottom:16px">
+        ${esPropio?'Ingresa tu contraseña actual y la nueva contraseña.':'Establece una nueva contraseña para <strong>'+escHtml(targetUser.nombre)+'</strong>.'}
       </div>
-      <button class="btn btn-red btn-sm" onclick="if(confirm('¿Limpiar toda la bitácora? Esta acción no se puede deshacer.')){DB.bitacora=[];sDB('bitacora');renderBitacora();toast('Bitácora limpiada','success')}">🗑 Limpiar todo</button>
-    </div>
-    <div class="card">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:14px">
-        <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:4px">Usuario</label>
-          <select id="bit-f-usuario" onchange="renderBitacora()" style="width:100%;padding:7px 10px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px">
-            <option value="">Todos</option>
-            ${usuarios.map(u=>`<option value="${escHtml(u)}" ${fUsuario===u?'selected':''}>${escHtml(u)}</option>`).join('')}
-          </select></div>
-        <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:4px">Módulo</label>
-          <select id="bit-f-modulo" onchange="renderBitacora()" style="width:100%;padding:7px 10px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px">
-            <option value="">Todos</option>
-            ${modulos.map(m=>`<option value="${escHtml(m)}" ${fModulo===m?'selected':''}>${escHtml(m)}</option>`).join('')}
-          </select></div>
-        <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:4px">Fecha</label>
-          <input type="date" id="bit-f-fecha" value="${fFecha}" onchange="renderBitacora()" style="width:100%;padding:7px 10px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px"></div>
-        <div><label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:4px">Buscar</label>
-          <input type="text" id="bit-f-buscar" value="${escHtml(fBuscar)}" oninput="renderBitacora()" placeholder="Acción, detalle..." style="width:100%;padding:7px 10px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px"></div>
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('bit-f-usuario').value='';document.getElementById('bit-f-modulo').value='';document.getElementById('bit-f-fecha').value='';document.getElementById('bit-f-buscar').value='';renderBitacora()">✕ Limpiar</button>
+      ${esPropio?`
+      <div class="form-field">
+        <label class="required">Contraseña actual</label>
+        <input type="password" id="cp-actual" placeholder="••••••••">
+      </div>`:''}
+      <div class="form-field">
+        <label class="required">Nueva contraseña</label>
+        <input type="password" id="cp-nueva" placeholder="Mínimo 4 caracteres">
       </div>
-      <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Mostrando <strong>${lista.length}</strong> de <strong>${bits.length}</strong> registros</div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Fecha</th><th>Hora</th><th>Usuario</th><th>Módulo</th><th>Acción</th><th>Detalle</th></tr></thead>
-          <tbody>${filas}</tbody>
-        </table>
+      <div class="form-field">
+        <label class="required">Confirmar nueva contraseña</label>
+        <input type="password" id="cp-confirmar" placeholder="Repite la contraseña">
       </div>
-    </div>`;
-}
-/* ═══════════════════════════════════════════ */
-
-function cambiarMiContrasena(){
-  openModal('🔑 Cambiar Mi Contraseña',`
-    <div class="form-field"><label>Contraseña actual</label><input type="password" id="cp-actual" placeholder="Contraseña actual" autocomplete="new-password"></div>
-    <div class="form-field"><label>Nueva contraseña</label><input type="password" id="cp-nueva" placeholder="Nueva contraseña (mínimo 6 caracteres)" autocomplete="new-password"></div>
-    <div class="form-field"><label>Confirmar nueva contraseña</label><input type="password" id="cp-confirmar" placeholder="Repite la nueva contraseña" autocomplete="new-password"></div>`,
+    </div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-     <button class="btn btn-primary" onclick="guardarCambioContrasena()">💾 Guardar</button>`);
+     <button class="btn btn-primary" onclick="guardarNuevaContrasena('${targetUser.id}',${esPropio})">💾 Guardar</button>`
+  );
 }
-function guardarCambioContrasena(){
-  const actual=document.getElementById('cp-actual').value;
-  const nueva=document.getElementById('cp-nueva').value;
-  const confirmar=document.getElementById('cp-confirmar').value;
-  const i=DB.users.findIndex(u=>u.id===currentUser.id);
-  if(i<0){toast('Usuario no encontrado','error');return;}
-  if(DB.users[i].password!==actual){toast('La contraseña actual es incorrecta','error');return;}
-  if(!nueva||nueva.length<6){toast('La nueva contraseña debe tener al menos 6 caracteres','error');return;}
+
+function guardarNuevaContrasena(uid,esPropio){
+  const nueva=document.getElementById('cp-nueva')?.value;
+  const confirmar=document.getElementById('cp-confirmar')?.value;
+  if(esPropio){
+    const actual=document.getElementById('cp-actual')?.value;
+    const user=DB.users.find(u=>u.id===uid);
+    if(!actual||user?.password!==actual){toast('La contraseña actual es incorrecta','error');return;}
+  }
+  if(!nueva||nueva.length<4){toast('La nueva contraseña debe tener al menos 4 caracteres','error');return;}
   if(nueva!==confirmar){toast('Las contraseñas no coinciden','error');return;}
+  const i=DB.users.findIndex(u=>u.id===uid);
+  if(i<0)return;
   DB.users[i].password=nueva;
-  currentUser.password=nueva;
+  if(currentUser.id===uid)currentUser.password=nueva;
   sDB('users');
   closeModal();
-  toast('Contraseña actualizada correctamente ✓','success');
+  toast('Contraseña actualizada ✓','success');
 }
+// ══════════════════════════════════════════════════════════════════════════
+
 function doLogout(){
   if(currentUser){
     logBit('Sesión','Cerró sesión','—');
@@ -1009,6 +787,12 @@ function doLogout(){
 /* ═══════════════════════════════════════════
    BITÁCORA DE ACTIVIDAD — máx 200 entradas
 ═══════════════════════════════════════════ */
+const _MOD_LABELS={dashboard:'Inicio',inventario:'Reg. Vehículo',gastosVeh:'Gastos Vehículo',
+  cxp:'Cuentas x Pagar',clientes:'Clientes',ventas:'Ventas',cxc:'Cuentas x Cobrar',
+  gastos:'Gastos Empresa',nomina:'Nómina',caja:'Caja',cotizaciones:'Cotizaciones',
+  autorizaciones:'Autorización',seguros:'Seguros',facturaExterna:'Facturas Ext.',
+  suplidores:'Suplidores',informes:'Informes',usuarios:'Usuarios',config:'Configuración',
+  cuentasBancarias:'Cuentas',backup:'Backup',bitacora:'Bitácora',alertas:'Alertas',chat:'Chat',prestamos:'Préstamos'};
 
 function logBit(modulo,accion,detalle){
   if(!currentUser)return;
@@ -2870,7 +2654,6 @@ function renderUsuarios(){
     {id:'seguros',label:'Seguros'},{id:'facturaExterna',label:'Facturas Externas'},
     {id:'alertas',label:'Alertas'},{id:'verSaldoCaja',label:'💰 Saldo Caja'},
     {id:'chat',label:'💬 Chat'},{id:'usuarios',label:'Usuarios'},
-    {id:'prestamos',label:'🏛️ Préstamos Bancos'},
     {id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},{id:'config',label:'Configuración'},
     {id:'cumpleanos',label:'🎂 Cumpleaños'},
   ];
@@ -3092,7 +2875,7 @@ function editarUsuario(i){
     {id:'cxc',label:'📬 Cuentas por Cobrar'},{id:'gastos',label:'🏢 Gastos Empresa'},
     {id:'nomina',label:'👷 Nómina'},{id:'caja',label:'💳 Caja'},
     {id:'cotizaciones',label:'📋 Cotizaciones'},{id:'autorizaciones',label:'📝 Autorización Compra'},
-    {id:'seguros',label:'🛡️ Seguros'},{id:'facturaExterna',label:'🧾 Facturas Externas'},{id:'alertas',label:'🔔 Alertas'},{id:'verSaldoCaja',label:'💰 Ver Saldo Caja'},{id:'chat',label:'💬 Chat Interno'},{id:'prestamos',label:'🏛️ Préstamos Bancos'},{id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},
+    {id:'seguros',label:'🛡️ Seguros'},{id:'facturaExterna',label:'🧾 Facturas Externas'},{id:'alertas',label:'🔔 Alertas'},{id:'verSaldoCaja',label:'💰 Ver Saldo Caja'},{id:'chat',label:'💬 Chat Interno'},{id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},
     {id:'cumpleanos',label:'🎂 Cumpleaños'},
   ];
   const mods=u.modulos||[];
@@ -3130,7 +2913,7 @@ function editarUsuario(i){
       </div>
       <div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--gray);text-transform:uppercase">✏️ Permisos de Editar por módulo:</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px">
-        ${[{k:'editarVentas',l:'Ventas'},{k:'editarClientes',l:'Clientes'},{k:'editarSuplidores',l:'Suplidores'},{k:'editarGastos',l:'Gastos'},{k:'editarNomina',l:'Nómina'},{k:'editarGastosVeh',l:'Gastos Vehículo'},{k:'editarCobros',l:'CxC Cobros'},{k:'editarCxP',l:'CxP Pagos'},{k:'editarVehiculos',l:'Vehículos'},{k:'editarCaja',l:'Caja'},{k:'editarCotizaciones',l:'Cotizaciones'},{k:'editarAutorizaciones',l:'Autorizaciones'},{k:'editarSeguros',l:'Seguros'},{k:'editarFacturas',l:'Facturas Ext.'},{k:'prestamosOtorgados',l:'🤝 Préstamos Otorgados'}].map(p=>`<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 6px;background:#eff6ff;border-radius:5px;border:1px solid #bfdbfe"><input type="checkbox" id="u-perm-${p.k}" ${(perms[p.k]||u.role==='admin')?'checked':''} style="accent-color:var(--blue)"> ${p.l}</label>`).join('')}
+        ${[{k:'editarVentas',l:'Ventas'},{k:'editarClientes',l:'Clientes'},{k:'editarSuplidores',l:'Suplidores'},{k:'editarGastos',l:'Gastos'},{k:'editarNomina',l:'Nómina'},{k:'editarGastosVeh',l:'Gastos Vehículo'},{k:'editarCobros',l:'CxC Cobros'},{k:'editarCxP',l:'CxP Pagos'},{k:'editarVehiculos',l:'Vehículos'},{k:'editarCaja',l:'Caja'},{k:'editarCotizaciones',l:'Cotizaciones'},{k:'editarAutorizaciones',l:'Autorizaciones'},{k:'editarSeguros',l:'Seguros'},{k:'editarFacturas',l:'Facturas Ext.'}].map(p=>`<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 6px;background:#eff6ff;border-radius:5px;border:1px solid #bfdbfe"><input type="checkbox" id="u-perm-${p.k}" ${(perms[p.k]||u.role==='admin')?'checked':''} style="accent-color:var(--blue)"> ${p.l}</label>`).join('')}
       </div>
       <div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--gray);text-transform:uppercase">🗑 Permisos de Borrar por módulo:</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
@@ -3190,7 +2973,7 @@ function guardarUsuario(idx){
   if(idx===undefined&&DB.users.find(u=>u.username===user)){toast('El usuario ya existe','error');return;}
   const MODS_IDS=['dashboard','informes','suplidores','inventario','gastosVeh','cxp','clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','cuentasBancarias','cumpleanos','prestamos'];
   const nuevosMods=MODS_IDS.filter(m=>{const el=document.getElementById('u-mod-'+m);return el&&el.checked;});
-  const permKeys=['editar','eliminar','imprimir','pdf','editarVentas','editarClientes','editarSuplidores','editarGastos','editarNomina','editarGastosVeh','editarCobros','editarCxP','editarVehiculos','editarCaja','editarCotizaciones','editarAutorizaciones','editarSeguros','editarFacturas','prestamosOtorgados','borrarVentas','borrarClientes','borrarSuplidores','borrarGastos','borrarNomina','borrarGastosVeh','borrarCobros','borrarCxP','borrarVehiculos','borrarCaja','borrarCotizaciones','borrarAutorizaciones','borrarSeguros','borrarFacturas'];
+  const permKeys=['editar','eliminar','imprimir','pdf','editarVentas','editarClientes','editarSuplidores','editarGastos','editarNomina','editarGastosVeh','editarCobros','editarCxP','editarVehiculos','editarCaja','editarCotizaciones','editarAutorizaciones','editarSeguros','editarFacturas','borrarVentas','borrarClientes','borrarSuplidores','borrarGastos','borrarNomina','borrarGastosVeh','borrarCobros','borrarCxP','borrarVehiculos','borrarCaja','borrarCotizaciones','borrarAutorizaciones','borrarSeguros','borrarFacturas'];
   const nuevosPerms={};permKeys.forEach(k=>{const el=document.getElementById('u-perm-'+k);if(el)nuevosPerms[k]=el.checked;});
   if(idx!==undefined){
     DB.users[idx].nombre=nombre;
@@ -4228,7 +4011,7 @@ function renderConfig(){
       <p style="font-size:13px;color:var(--gray);margin-bottom:14px">Activa los campos que quieres hacer obligatorios en cada módulo. El sistema mostrará un error si el usuario intenta guardar sin llenarlos.</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
         ${Object.entries(CAMPOS_MODULOS).map(([mod,campos])=>{
-          const modLabel={inventario:'🚗 Registro Vehículo',ventas:'💰 Ventas',clientes:'👤 Clientes',gastosVeh:'💸 Gastos Vehículo',gastos:'🏢 Gastos Empresa',nomina:'👷 Nómina',cxc:'📬 CxC',seguros:'🛡️ Seguros',prestamos:'🏛️ Préstamos Bancos'}[mod]||mod;
+          const modLabel={inventario:'🚗 Registro Vehículo',ventas:'💰 Ventas',clientes:'👤 Clientes',gastosVeh:'💸 Gastos Vehículo',gastos:'🏢 Gastos Empresa',nomina:'👷 Nómina',cxc:'📬 CxC',seguros:'🛡️ Seguros',prestamos:'🏛️ Préstamos'}[mod]||mod;
           const requeridos=(DB.config.camposRequeridos||{})[mod]||[];
           return `<div style="background:var(--gray2);border-radius:10px;padding:12px;border:1px solid var(--gray3)">
             <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">${modLabel}</div>
@@ -6028,7 +5811,7 @@ function nuevaVenta(){
       </div>
 
       <!-- PASO 3a: Detalles Endoso -->
-      <div id="sv-endoso-wrap">
+      <div id="sv-endoso-wrap" style="display:none">
         <div class="form-row c2" style="margin-bottom:8px">
           <div class="form-field" style="margin:0">
             <label style="font-size:10px;font-weight:700">💰 Costo del Endoso</label>
@@ -6114,7 +5897,13 @@ function nuevaVenta(){
     </div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
      <button class="btn btn-green" onclick="confirmarVenta('${nf}')">✅ Confirmar Venta</button>`);
-  setTimeout(()=>svSelTitulacion('endoso'),100);
+  // Activar Endorso por defecto al abrir el modal
+  const _activarEndoso=()=>{
+    const btn=document.getElementById('sv-btn-endoso');
+    if(btn){svSelTitulacion('endoso');}
+    else{setTimeout(_activarEndoso,50);}
+  };
+  setTimeout(_activarEndoso,100);
 }
 
 let ventaSelectedId=null;
@@ -6352,15 +6141,15 @@ function svSelTitulacion(tipo){
   // Activar seleccionado
   if(tipo==='endoso'){
     if(btnEndoso)btnEndoso.style.cssText='flex:1;min-width:100px;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;'+activeStyle;
-    if(endosoWrap)endosoWrap.style.display='';
+    if(endosoWrap)endosoWrap.style.display='block';
     if(traspasoWrap)traspasoWrap.style.display='none';
-    if(gestorWrap)gestorWrap.style.display='';
+    if(gestorWrap)gestorWrap.style.display='block';
     if(tipoInput)tipoInput.value='endoso';
   } else if(tipo==='traspaso'){
     if(btnTraspaso)btnTraspaso.style.cssText='flex:1;min-width:100px;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;'+activeStyle;
     if(endosoWrap)endosoWrap.style.display='none';
-    if(traspasoWrap)traspasoWrap.style.display='';
-    if(gestorWrap)gestorWrap.style.display='';
+    if(traspasoWrap)traspasoWrap.style.display='block';
+    if(gestorWrap)gestorWrap.style.display='block';
     if(tipoInput)tipoInput.value='traspaso';
     toggleTraspasoFields();
   } else {
@@ -8875,7 +8664,7 @@ function renderCXC(){
         ${(currentUser?.role==='admin'||canDo('eliminar'))?`<button id="cxc-btn-eliminar" disabled class="btn btn-sm" style="${ds}" onclick="cxcAccion('eliminar')">🗑 Eliminar</button>`:''}
         <div style="width:1px;height:28px;background:var(--gray3);margin:0 2px"></div>
         <button class="btn btn-secondary btn-sm" onclick="imprimirCXC()">📄 PDF</button>
-        ${(currentUser?.role==='admin'||canDo('editar'))?`<button class="btn btn-primary" onclick="nuevaCXCManual()">➕ Nueva CxC</button>`:''} ${(currentUser?.role==='admin'||currentUser?.permisos?.prestamosOtorgados)?`<button class="btn btn-sm" style="background:var(--green);color:#fff" onclick="nuevaPrestamoOtorgado()">🤝 Préstamo Otorgado</button>`:''}
+        ${(currentUser?.role==='admin'||canDo('editar'))?`<button class="btn btn-primary" onclick="nuevaCXCManual()">➕ Nueva CxC</button> <button class="btn btn-sm" style="background:var(--green);color:#fff" onclick="nuevaPrestamoOtorgado()">🤝 Préstamo Otorgado</button>`:''}
       </div>
     </div>
 
@@ -10644,7 +10433,93 @@ function aplicarColoresSistema(){
 //  FUNCIONES TRASPLANTADAS DE MAEDIG
 // ═══════════════════════════════════════════════════
 
+const MENU_DEFS=[
+  {id:'dashboard',   sec:'PRINCIPAL', ico:'🏠', label:'Inicio'},
+  {id:'informes',    sec:'PRINCIPAL', ico:'📊', label:'Informe Mensual'},
+  {id:'suplidores',  sec:'VEHÍCULOS', ico:'🏭', label:'Suplidores'},
+  {id:'inventario',  sec:'VEHÍCULOS', ico:'🚗', label:'Registro de Vehículo'},
+  {id:'gastosVeh',   sec:'VEHÍCULOS', ico:'💸', label:'Gastos de Vehículo'},
+  {id:'cxp',         sec:'VEHÍCULOS', ico:'📑', label:'Cuentas por Pagar'},
+  {id:'clientes',    sec:'CLIENTES',  ico:'👤', label:'Clientes'},
+  {id:'ventas',      sec:'CLIENTES',  ico:'💰', label:'Ventas'},
+  {id:'cxc',         sec:'CLIENTES',  ico:'📬', label:'Cuentas por Cobrar'},
+  {id:'gastos',      sec:'FINANZAS',  ico:'🏢', label:'Gastos Empresa'},
+  {id:'nomina',      sec:'FINANZAS',  ico:'👷', label:'Nómina'},
+  {id:'caja',        sec:'FINANZAS',  ico:'💳', label:'Caja'},
+  {id:'cotizaciones',sec:'OTROS',     ico:'📋', label:'Cotizaciones'},
+  {id:'autorizaciones',sec:'OTROS',   ico:'📝', label:'Autorización Compra'},
+  {id:'seguros',     sec:'OTROS',     ico:'🛡️', label:'Seguros'},
+  {id:'facturaExterna',sec:'OTROS',   ico:'🧾', label:'Facturas Externas'},
+  {id:'chat',        sec:'OTROS',     ico:'💬', label:'Chat Interno'},
+  {id:'prestamos',   sec:'SISTEMA',   ico:'🏛️', label:'Préstamos'},
+  {id:'cuentas',     sec:'SISTEMA',   ico:'🏦', label:'Cuentas'},
+  {id:'cumpleanos',  sec:'SISTEMA',   ico:'🎂', label:'Cumpleaños'},
+  {id:'alertas',     sec:'SISTEMA',   ico:'🔔', label:'Alertas del Sistema'},
+  {id:'usuarios',    sec:'SISTEMA',   ico:'👥', label:'Usuarios'},
+  {id:'config',      sec:'SISTEMA',   ico:'⚙️', label:'Configuración'},
+];
 
+const CAMPOS_MODULOS={
+  inventario:[
+    {id:'vin',        label:'Número de Chasis / VIN'},
+    {id:'placa',      label:'Placa del Vehículo'},
+    {id:'color',      label:'Color'},
+    {id:'motor',      label:'Número de Motor'},
+    {id:'anio',       label:'Año del Vehículo'},
+    {id:'costo',      label:'Costo de Compra'},
+    {id:'suplidor',   label:'Suplidor / Proveedor'},
+    {id:'tipoCompra', label:'Tipo de Compra'},
+  ],
+  ventas:[
+    {id:'cliente',    label:'Cliente'},
+    {id:'precio',     label:'Precio de Venta'},
+    {id:'metodoPago', label:'Método de Pago'},
+    {id:'fecha',      label:'Fecha de Venta'},
+    {id:'inicial',    label:'Inicial / Abono'},
+    {id:'gestor',     label:'Gestor de Transferencia'},
+    {id:'fechaEntrega',label:'Fecha de Entrega'},
+  ],
+  clientes:[
+    {id:'telefono',   label:'Teléfono / Celular'},
+    {id:'documento',  label:'Cédula / Documento'},
+    {id:'ciudad',     label:'Ciudad'},
+    {id:'direccion',  label:'Dirección'},
+    {id:'ingresos',   label:'Ingresos Mensuales'},
+    {id:'cumpleanos', label:'Fecha de Cumpleaños'},
+  ],
+  gastosVeh:[
+    {id:'suplidor',   label:'Suplidor'},
+    {id:'nroFactura', label:'Número de Factura'},
+    {id:'fechaPago',  label:'Fecha de Pago'},
+    {id:'banco',      label:'Banco / Cuenta'},
+  ],
+  gastos:[
+    {id:'suplidor',   label:'Suplidor'},
+    {id:'nroFactura', label:'Número de Factura'},
+    {id:'fechaLimite',label:'Fecha Límite de Pago'},
+    {id:'banco',      label:'Banco / Cuenta'},
+  ],
+  nomina:[
+    {id:'cedula',     label:'Cédula del Empleado'},
+    {id:'banco',      label:'Banco para Pago'},
+    {id:'numeroCuenta',label:'Número de Cuenta Bancaria'},
+    {id:'cargo',      label:'Cargo / Puesto'},
+  ],
+  cxc:[
+    {id:'fechaVence', label:'Fecha de Vencimiento'},
+    {id:'banco',      label:'Banco / Cuenta de Cobro'},
+  ],
+  seguros:[
+    {id:'poliza',     label:'Número de Póliza'},
+    {id:'vencimiento',label:'Fecha de Vencimiento'},
+    {id:'banco',      label:'Banco / Cuenta de Pago'},
+  ],
+  prestamos:[
+    {id:'entidad',    label:'Banco / Entidad Prestamista'},
+    {id:'tasa',       label:'Tasa de Interés'},
+    {id:'notas',      label:'Notas / Referencia Contrato'},
+  ],
+};
 
 
 
@@ -10658,7 +10533,7 @@ function renderPrestamos(){
 
   pg.innerHTML=`
   <div class="page-header">
-    <div><h1>🏛️ Préstamos Bancos</h1><p style="font-size:13px;color:var(--gray)">Préstamos recibidos — bancos, entidades y personas físicas</p></div>
+    <div><h1>🏛️ Módulo de Préstamos</h1><p style="font-size:13px;color:var(--gray)">Préstamos recibidos — bancos, entidades y personas físicas</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="modalNuevoPrestamo()">➕ Nuevo Préstamo</button>
     </div>
@@ -11820,18 +11695,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 document.getElementById('li-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('li-user').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('li-pass').focus();});
 function _iniciarConFirebase(){
-  // Si se abre localmente (file://) no intentar Firebase — entrar directo
-  if(window.location.protocol==='file:'){
-    window._fbActivo=false;
-    window._fbCargado=true; // Permite entrar con datos locales
-    const btn=document.querySelector('.btn-login');
-    if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
-    const _dot=document.getElementById('fb-dot');
-    const _txt=document.getElementById('fb-text');
-    if(_dot)_dot.style.background='#94a3b8';
-    if(_txt)_txt.textContent='Modo local';
-    return;
-  }
   if(typeof fbCargar==='function'){
     const btn=document.querySelector('.btn-login');
     const safetyTimeout=setTimeout(()=>{
@@ -11841,7 +11704,7 @@ function _iniciarConFirebase(){
       clearTimeout(safetyTimeout);
       window._fbActivo=true;
       window._fbCargado=true;
-      // Listeners se activan en _entrarDashboard después del login
+      if(typeof fbActivarListeners==='function') fbActivarListeners();
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
       const _dot=document.getElementById('fb-dot');
       const _txt=document.getElementById('fb-text');
@@ -11853,276 +11716,6 @@ function _iniciarConFirebase(){
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
     });
   }
-}
-
-// ═══════════════════════════════════════════════════════════
-
-// ══ RECIBO DE PAGO — UNA HOJA, DOS COPIAS ══
-function fmtP(n,moneda){
-  const m=moneda||'RD$';const v=parseFloat(n||0);
-  return m==='USD'?'USD '+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'RD$ '+v.toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2});
-}
-
-// Recibo de pago: una hoja con dos copias (cliente y empresa)
-function imprimirReciboPago(tipo, refId, prestamoId, pagoId){
-  let pago=null, nombreParte='', concepto='', saldoTras=0, moneda='RD$';
-  const empresa=DB.config.empresa||'ChinitoCars';
-  const rnc=DB.config.rnc||'';
-  const dir=DB.config.direccion||'';
-  const tel=DB.config.telefono||'';
-  const logoUrl=DB.config.logoData||DB.config.logo||'';
-  const tipoLabel={cuota:'Pago de Cuota',abono:'Abono Extraordinario a Capital',CUOTA:'Pago de Cuota',EXTRAORDINARIO:'Abono Extraordinario a Capital',LINEA:'Pago Línea de Crédito'};
-
-  if(tipo==='prestamo'){
-    const p=DB.prestamos.find(x=>x.id===prestamoId);
-    if(!p)return toast('Préstamo no encontrado','error');
-    pago=(p.pagos||[]).find(pg=>pg.id===pagoId);
-    if(!pago)return toast('Pago no encontrado','error');
-    nombreParte=p.entidad||p.nombre;
-    moneda=pago.moneda||p.moneda||'RD$';
-    concepto=tipoLabel[pago.tipo]||pago.tipo||'Pago';
-    const idxPago=(p.pagos||[]).findIndex(pg=>pg.id===pagoId);
-    const capitalAnterior=(p.pagos||[]).slice(0,idxPago+1).reduce((a,pg)=>a+parseFloat(pg.capital||0),0);
-    saldoTras=Math.max(0,parseFloat(p.monto||0)-capitalAnterior);
-  } else if(tipo==='prestamo_otorgado'){
-    const x=DB.cxc.find(c=>c.id===refId);
-    if(!x)return toast('CxC no encontrada','error');
-    // Para préstamos otorgados el pago está en x.pagos (índice numérico)
-    pago=(x.pagos||[])[parseInt(pagoId)||0];
-    if(!pago)return toast('Pago no encontrado','error');
-    nombreParte=x.cliente;
-    moneda=x.moneda||'RD$';
-    concepto='Cobro Cuota — Préstamo Otorgado';
-    const idx=parseInt(pagoId)||0;
-    const capitalAnterior=(x.pagos||[]).slice(0,idx+1).reduce((a,pg)=>a+parseFloat(pg.monto||0),0);
-    saldoTras=Math.max(0,parseFloat(x.total||0)-capitalAnterior);
-  }
-  if(!pago)return;
-  const fmtV=(n)=>fmtP(n,moneda);
-  const nRecibo='REC-'+String(Date.now()).slice(-6);
-  const capital=parseFloat(pago.capital||pago.monto||0);
-  const interes=parseFloat(pago.interes||0);
-  const montoTotal=parseFloat(pago.monto||0);
-
-  const copiaHTML=(titulo,colorHex)=>`
-    <div class="copia" style="border-top:${titulo==='COPIA EMPRESA'?'2px dashed #94a3b8':'none'}">
-      <div style="display:inline-block;background:${colorHex};color:#fff;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:2px;padding:4px 14px;border-radius:20px;margin-bottom:14px">${titulo}</div>
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
-        <div style="display:flex;align-items:center;gap:12px">
-          ${logoUrl?`<img src="${logoUrl}" style="width:70px;height:70px;object-fit:contain;border-radius:6px">`
-            :`<div style="width:70px;height:70px;background:${colorHex};border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff">${(empresa[0]||'C')}</div>`}
-          <div>
-            <div style="font-size:17px;font-weight:900;color:#0f172a">${escHtml(empresa)}</div>
-            ${rnc?`<div style="font-size:11px;color:${colorHex};font-weight:700">RNC: ${escHtml(rnc)}</div>`:''}
-            ${dir?`<div style="font-size:10px;color:#6b7280">${escHtml(dir)}</div>`:''}
-            ${tel?`<div style="font-size:10px;color:#6b7280">Tel: ${escHtml(tel)}</div>`:''}
-          </div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:13px;font-weight:900;color:${colorHex};text-transform:uppercase;letter-spacing:1px">Recibo de Pago</div>
-          <div style="font-size:10px;color:#6b7280;margin-top:3px">N° ${nRecibo}</div>
-          <div style="font-size:12px;font-weight:700;color:#0f172a;margin-top:3px">${fmtDate(pago.fecha||today())}</div>
-          <div style="font-size:10px;color:#6b7280;margin-top:2px">${moneda==='USD'?'💵 USD':'🟢 RD$'}</div>
-        </div>
-      </div>
-      <div style="border-top:1px solid #e2e8f0;margin:10px 0"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">${tipo==='prestamo'?'Acreedor / Banco':'Cliente'}</div>
-          <div style="font-size:12px;font-weight:600;padding:4px 8px;background:#f8fafc;border-radius:4px;border-left:3px solid ${colorHex}">${escHtml(nombreParte)}</div></div>
-        <div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Concepto</div>
-          <div style="font-size:12px;font-weight:600;padding:4px 8px;background:#f8fafc;border-radius:4px;border-left:3px solid ${colorHex}">${escHtml(concepto)}</div></div>
-      </div>
-      <div style="border-top:1px solid #e2e8f0;margin:10px 0"></div>
-      <table style="width:100%;border-collapse:collapse;margin:4px 0">
-        <tr><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569">Capital Abonado</td>
-          <td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;font-size:13px;color:#2563eb">${fmtV(capital)}</td></tr>
-        <tr><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:12px;color:#475569">${tipo==='prestamo'?'Interés Pagado':'Interés Cobrado'}</td>
-          <td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;font-size:13px;color:#d97706">${fmtV(interes)}</td></tr>
-        <tr style="background:#eff6ff"><td style="padding:10px 12px;font-size:14px;font-weight:900;border-bottom:2px solid ${colorHex}">TOTAL ${tipo==='prestamo'?'PAGADO':'COBRADO'}</td>
-          <td style="padding:10px 12px;text-align:right;font-size:15px;font-weight:900;border-bottom:2px solid ${colorHex}">${fmtV(montoTotal)}</td></tr>
-        <tr style="background:#f0fdf4"><td style="padding:7px 12px;font-size:12px;color:#475569">Saldo Pendiente Restante</td>
-          <td style="padding:7px 12px;text-align:right;font-weight:800;font-size:13px;color:#dc2626">${fmtV(saldoTras)}</td></tr>
-      </table>
-      <div style="border-top:1px solid #e2e8f0;margin:10px 0"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:4px">
-        ${pago.banco?`<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Banco</div><div style="font-size:12px;font-weight:600;padding:4px 8px;background:#f8fafc;border-radius:4px;border-left:3px solid ${colorHex}">${escHtml(pago.banco)}</div></div>`:''}
-        ${pago.cuenta?`<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Cuenta</div><div style="font-size:11px;font-family:monospace;font-weight:600;padding:4px 8px;background:#f8fafc;border-radius:4px;border-left:3px solid ${colorHex}">${escHtml(pago.cuenta)}</div></div>`:''}
-        ${(pago.nota||pago.referencia)?`<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:2px">Referencia</div><div style="font-size:11px;font-weight:600;padding:4px 8px;background:#f8fafc;border-radius:4px;border-left:3px solid ${colorHex}">${escHtml(pago.nota||pago.referencia||'')}</div></div>`:''}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:28px">
-        <div style="text-align:center">
-          <div style="height:40px;border-top:1.5px solid #0f172a;margin-bottom:5px"></div>
-          <div style="font-size:11px;font-weight:700;color:#0f172a">${escHtml(nombreParte)}</div>
-          <div style="font-size:10px;color:#6b7280">${tipo==='prestamo'?'Representante Empresa':'Firma del Cliente'}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="height:40px;border-top:1.5px solid #0f172a;margin-bottom:5px"></div>
-          <div style="font-size:11px;font-weight:700;color:#0f172a">${escHtml(DB.config.responsable||empresa)}</div>
-          <div style="font-size:10px;color:#6b7280">Firma Autorizada — ${escHtml(empresa)}</div>
-        </div>
-      </div>
-    </div>`;
-
-  const win=window.open('','_blank','width=780,height=900');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recibo ${nRecibo}</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#0f172a;background:#fff}
-    .page{max-width:720px;margin:0 auto;padding:20px}
-    .copia{padding:20px 0 16px}
-    .np{margin-top:20px;text-align:center}
-    @media print{.np{display:none}.copia{page-break-inside:avoid}}
-  </style></head><body><div class="page">
-    ${copiaHTML('COPIA CLIENTE','#2563eb')}
-    ${copiaHTML('COPIA EMPRESA','#16a34a')}
-    <div class="np">
-      <button onclick="window.print()" style="padding:10px 28px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:700">🖨️ Imprimir / Guardar PDF</button>
-    </div>
-  </div></body></html>`);
-  win.document.close();
-}
-
-// Botón imprimir desde historial de pagos (préstamos bancos)
-function imprimirReciboPrestamoBanco(pid, pagoId){
-  imprimirReciboPago('prestamo', pid, pid, pagoId);
-}
-
-// Abono extraordinario para préstamos otorgados en CxC — cobro con confirmación de impresión
-function abonarCXCPrestamoOtorgado(cxcId){
-  const x=DB.cxc.find(c=>c.id===cxcId);
-  if(!x||!x.esPrestamo)return abonarCXC(cxcId);
-  const fmtMon=x.moneda==='USD'?fmtUSD:fmt;
-  const tasaMensual=(x.tasaPrestamo||0)/100/12;
-  const interesActual=round2((x.saldo||0)*tasaMensual);
-  const cuotaRef=x.cuotaRefPrestamo||0;
-  openModal(`🤝 Cobrar Cuota — ${escHtml(x.cliente)}`,`
-    <div style="background:var(--green2);border-radius:8px;padding:12px;margin-bottom:12px">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
-        <div><div style="font-size:10px;color:var(--green);font-weight:700">SALDO</div>
-          <div style="font-weight:800;color:var(--red);font-size:14px">${fmtMon(x.saldo||0)}</div></div>
-        <div><div style="font-size:10px;color:var(--green);font-weight:700">CUOTA APROX.</div>
-          <div style="font-weight:700;font-size:13px">${fmtMon(cuotaRef)}</div></div>
-        <div><div style="font-size:10px;color:var(--green);font-weight:700">TASA</div>
-          <div style="font-weight:700;font-size:13px">${x.tasaPrestamo||0}%/año</div></div>
-      </div>
-    </div>
-    <div style="background:var(--blue3);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px">
-      Interés del período (aprox.): <strong style="color:var(--amber)">${fmtMon(interesActual)}</strong>
-    </div>
-    <div class="form-row c2">
-      <div class="form-field"><label>Fecha de Cobro</label><input type="date" id="cpo-fecha" value="${today()}"></div>
-      <div class="form-field"><label class="required">Monto Cobrado</label>
-        <input type="text" id="cpo-monto" value="${fmtMoneyDisplay(cuotaRef||interesActual)}"
-          oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)">
-      </div>
-    </div>
-    ${htmlMonedaBancoCuenta('cpo', x.moneda||'RD$')}
-    <div class="form-field"><label>Nota</label><input type="text" id="cpo-nota" placeholder="N° recibo..."></div>`,
-    `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-     <button class="btn btn-green" onclick="guardarCobroCXCPrestamoOtorgado('${cxcId}')">💰 Registrar Cobro</button>`);
-}
-
-function guardarCobroCXCPrestamoOtorgado(cxcId){
-  const ci=DB.cxc.findIndex(c=>c.id===cxcId);if(ci<0)return;
-  const x=DB.cxc[ci];
-  const monto=parseFloat((document.getElementById('cpo-monto')?.value||'0').replace(/,/g,''))||0;
-  if(!monto){toast('El monto es requerido','error');return;}
-  const fecha=document.getElementById('cpo-fecha')?.value||today();
-  const banco=document.getElementById('cpo-banco')?.value||'';
-  const cuenta=document.getElementById('cpo-cuenta')?.value||'';
-  const monedaCobro=document.getElementById('cpo-moneda')?.value||x.moneda||'RD$';
-  const nota=document.getElementById('cpo-nota')?.value||'';
-  const tasaMensual=(x.tasaPrestamo||0)/100/12;
-  const interesActual=round2((x.saldo||0)*tasaMensual);
-  const interesACobrar=Math.min(interesActual,monto);
-  const capitalCobrado=Math.max(0,monto-interesACobrar);
-  const nuevoSaldo=Math.max(0,(x.saldo||0)-capitalCobrado);
-  if(!DB.cxc[ci].pagos)DB.cxc[ci].pagos=[];
-  const pagoIdx=DB.cxc[ci].pagos.length;
-  DB.cxc[ci].pagos.push({fecha,monto,capital:capitalCobrado,interes:interesACobrar,banco,cuenta,moneda:monedaCobro,nota});
-  DB.cxc[ci].abonado=(DB.cxc[ci].abonado||0)+capitalCobrado;
-  DB.cxc[ci].saldo=nuevoSaldo;
-  DB.cxc[ci].status=nuevoSaldo<=0?'SALDADO':capitalCobrado>0?'PARCIAL':'PENDIENTE';
-  if(capitalCobrado>0)DB.caja.push({id:uid(),fecha,tipo:'ENTRADA',categoria:'Cobro Capital Préstamo',
-    descripcion:`Capital cobrado — préstamo ${escHtml(x.cliente)}`,
-    monto:capitalCobrado,moneda:monedaCobro,banco,cuenta,responsable:currentUser?.nombre||''});
-  if(interesACobrar>0)DB.caja.push({id:uid(),fecha,tipo:'ENTRADA',categoria:'Interés Cobrado Préstamo',
-    descripcion:`Interés cobrado — préstamo ${escHtml(x.cliente)}`,
-    monto:interesACobrar,moneda:monedaCobro,banco,cuenta,responsable:currentUser?.nombre||''});
-  sDB('cxc');sDB('caja');
-  closeModal();
-  if(confirm(`✅ Cobro registrado. Interés: ${fmtP(interesACobrar,x.moneda||'RD$')} → Caja. Saldo: ${fmtP(nuevoSaldo,x.moneda||'RD$')}\n\n¿Desea imprimir el recibo?`)){
-    imprimirReciboPago('prestamo_otorgado',cxcId,cxcId,pagoIdx);
-  }
-  renderCXC();
-}
-
-// Agregar botón de recibo al historial de pagos de préstamos bancos
-// Llama a verDetallePrestamo extendida con botón de impresión por pago
-function verHistorialPagosPrestamo(pid){
-  const p=DB.prestamos.find(x=>x.id===pid);if(!p)return;
-  const m=p.moneda||'RD$';const fmtMon=m==='USD'?fmtUSD:fmt;
-  const pagos=p.pagos||[];
-  if(!pagos.length){toast('Sin pagos registrados aún','warning');return;}
-  const totalCapital=pagos.reduce((a,pg)=>a+parseFloat(pg.capital||0),0);
-  const totalInteres=pagos.reduce((a,pg)=>a+parseFloat(pg.interes||0),0);
-  const rows=pagos.slice().reverse().map((pg,ri)=>{
-    const realIdx=pagos.length-1-ri;
-    return `<tr>
-      <td style="font-size:12px">${fmtDate(pg.fecha)}</td>
-      <td><span style="font-size:11px;font-weight:700;color:var(--blue)">${pg.tipo==='abono'?'⚡ Abono Capital':'💳 Cuota'}</span></td>
-      <td style="text-align:right;font-weight:700">${fmtMon(pg.monto)}</td>
-      <td style="text-align:right;color:var(--blue)">${fmtMon(pg.capital||0)}</td>
-      <td style="text-align:right;color:var(--amber)">${fmtMon(pg.interes||0)}</td>
-      <td style="font-size:11px;color:var(--gray)">${escHtml(pg.nota||pg.referencia||'—')}</td>
-      <td><button class="btn btn-sm" style="background:#eff6ff;color:var(--blue);font-size:11px" onclick="imprimirReciboPago('prestamo','${pid}','${pid}','${pg.id||realIdx}')">🖨️</button></td>
-    </tr>`;
-  }).join('');
-  openModal(`📜 Historial Pagos — ${escHtml(p.nombre||p.entidad)}`,`
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-      <div style="background:var(--gray2);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:10px;color:var(--gray);font-weight:700">PAGOS</div>
-        <div style="font-size:18px;font-weight:800">${pagos.length}</div></div>
-      <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:10px;color:var(--blue);font-weight:700">CAPITAL PAGADO</div>
-        <div style="font-size:14px;font-weight:800;color:var(--blue)">${fmtMon(totalCapital)}</div></div>
-      <div style="background:#fef3c7;border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:10px;color:var(--amber);font-weight:700">INTERÉS PAGADO</div>
-        <div style="font-size:14px;font-weight:800;color:var(--amber)">${fmtMon(totalInteres)}</div></div>
-    </div>
-    <div class="table-wrap"><table>
-      <thead><tr><th>Fecha</th><th>Tipo</th><th>Total</th><th>Capital</th><th>Interés</th><th>Nota</th><th>🖨️</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>`,
-    `<button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>`);
-}
-
-// Ofrecer imprimir al guardar pago cuota bancos
-function guardarPagoCuotaConRecibo(pid){
-  const p=DB.prestamos.find(x=>x.id===pid);if(!p)return;
-  const prox=getProximaCuota(p);if(!prox)return;
-  const monto=parseFloat((document.getElementById('pc-monto')?.value||'').replace(/,/g,''))||0;
-  const fecha=document.getElementById('pc-fecha')?.value||today();
-  const cuenta=document.getElementById('pc-cuenta')?.value||'';
-  const banco=document.getElementById('pc-banco')?.value||'';
-  const moneda=document.getElementById('pc-moneda')?.value||p.moneda||'RD$';
-  const nota=document.getElementById('pc-nota')?.value.trim()||'';
-  if(monto<=0){toast('Ingresa el monto pagado','error');return;}
-  if(!p.pagos)p.pagos=[];
-  const pagoId=uid();
-  p.pagos.push({id:pagoId,tipo:'cuota',num:prox.num,monto,capital:prox.capital,interes:prox.interes,esUltima:prox.esUltima||false,fecha,cuenta,banco,moneda,nota});
-  if(calcSaldoPrestamo(p)<=0.01)p.estado='PAGADO';
-  sDB('prestamos');
-  closeModal();
-  if(confirm('✅ Cuota registrada.\n\n¿Desea imprimir el recibo de pago?')){
-    imprimirReciboPago('prestamo',pid,pid,pagoId);
-  }
-  renderPrestamos();
-}
-
-// Permiso prestamosOtorgados — verificar acceso
-function puedePrestamosOtorgados(){
-  return currentUser?.role==='admin'||!!currentUser?.permisos?.prestamosOtorgados;
 }
 
 </script>
@@ -12328,23 +11921,43 @@ async function fbCargar(){
 const _sDB_orig = sDB;
 window._fbActivo = false;
 window._fbCargado = false;
-// Bloquear modal de error Firebase durante arranque inicial
+// Firebase OBLIGATORIO — sin Firebase no se guarda nada
+window.sDB = function(key){
+  try { _sDB_orig(key); } catch(e){}  // localStorage solo como caché de lectura
+  const dot=document.getElementById('fb-dot');
+  const txt=document.getElementById('fb-text');
+  if(!window._fbActivo){
+    if(dot)dot.style.background='#ef4444';
+    if(txt)txt.textContent='Sin Firebase';
+    _mostrarErrorFirebase();
+    return;
+  }
+  if(dot)dot.style.background='#f59e0b';
+  if(txt)txt.textContent='Guardando...';
+  fbGuardar(key).then(()=>{
+    if(dot)dot.style.background='#22c55e';
+    if(txt)txt.textContent='✓ Guardado';
+    clearTimeout(window._fbTxtTimer);
+    window._fbTxtTimer=setTimeout(()=>{const t=document.getElementById('fb-text');if(t)t.textContent='✓ Firebase';},2500);
+  }).catch((e)=>{
+    if(dot)dot.style.background='#ef4444';
+    if(e&&(e.code==='permission-denied'||e.code==='unauthenticated')){
+      if(txt)txt.textContent='Sesión expirada';
+      setTimeout(()=>{if(confirm('Tu sesión expiró. ¿Volver a iniciar sesión?'))doLogout();},400);
+    } else {
+      if(txt)txt.textContent='Error al guardar';
+      _mostrarErrorFirebase();
+    }
+  });
+};
 
 // Bloquear modal de error Firebase durante arranque inicial
 window._fbArranque=true;
 setTimeout(()=>{ window._fbArranque=false; }, 5000);
 
 function _mostrarErrorFirebase(){
-  if(window._fbArranque) return;
+  if(window._fbArranque) return; // Durante arranque no mostrar error
   if(window._fbErrorVisible)return;
-  // Si el usuario ya está logueado, solo mostrar aviso en topbar — no bloquear
-  if(window.currentUser){
-    const txt=document.getElementById('fb-text');
-    const dot=document.getElementById('fb-dot');
-    if(dot)dot.style.background='#ef4444';
-    if(txt)txt.textContent='Sin Firebase';
-    return;
-  }
   window._fbErrorVisible=true;
   const ov=document.createElement('div');
   ov.id='fb-error-modal';
@@ -12521,6 +12134,7 @@ function fbActivarListeners(){
   });
   console.log('✅ Firebase listeners activos — tiempo real habilitado');
 }
+
 window.forzarSincronizacion = async function(){
   if(!window._fbActivo){toast('Firebase no está conectado','error');return;}
   const keys=['config','users','vehiculos','clientes','suplidores','ventas','cotizaciones',
@@ -12562,10 +12176,14 @@ window.fbIniciar = async function(){
     if(loaded){
       setStatus('#22c55e','✓ Firebase');
       window._fbCargado=true;
-      // Listeners se activan en _entrarDashboard después del login
+      // Activar listeners de tiempo real
+      if(typeof fbActivarListeners==='function') fbActivarListeners();
+      // Actualizar sidebar con logo de Firebase
       if(typeof actualizarLogoSidebar==='function') actualizarLogoSidebar();
+      // Actualizar topbar empresa
       const _empFb=document.getElementById('topbar-empresa');
       if(_empFb&&DB.config.empresa)_empFb.textContent=DB.config.empresa;
+      // Aplicar colores inmediatamente tras cargar Firebase
       if(typeof aplicarColoresSistema==='function'&&DB.config.colores)aplicarColoresSistema();
       // Re-renderizar CUALQUIER página activa con los datos de Firebase
       const _activePage=document.querySelector('.page.active');
@@ -12606,15 +12224,496 @@ window.fbIniciar = async function(){
 };
 // Arrancar — todo está definido aquí
 _iniciarConFirebase();
-// Ocultar welcome si no hay usuario tras 15 seg
-setTimeout(()=>{
-  const ws=document.getElementById('welcome-screen');
-  if(ws&&!ws.classList.contains('hidden')&&!window.currentUser){
-    ws.classList.remove('show');
-    const ls=document.getElementById('login-screen');
-    if(ls)ls.style.display='flex';
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  MÓDULO PRÉSTAMOS — MAEDIG
+//  Soporta: Amortización Francesa (cuota fija) y Capital Fijo
+//  Prestamistas: Banco/Entidad o Persona física
+//  Monedas: RD$ y USD | Abonos a capital
+// ═══════════════════════════════════════════════════════════
+
+function renderPrestamos(){
+  const pg=document.getElementById('page-prestamos');
+  if(!pg)return;
+  const lista=DB.prestamos||[];
+  const totalDeudaRD=lista.filter(p=>p.moneda==='RD$'&&p.estado!=='PAGADO').reduce((a,p)=>a+calcSaldoPrestamo(p),0);
+  const totalDeudaUSD=lista.filter(p=>p.moneda==='USD'&&p.estado!=='PAGADO').reduce((a,p)=>a+calcSaldoPrestamo(p),0);
+  const totalPagadoRD=lista.filter(p=>p.moneda==='RD$').reduce((a,p)=>a+(p.pagos||[]).reduce((b,x)=>b+parseFloat(x.monto||0),0),0);
+
+  pg.innerHTML=`
+  <div class="page-header">
+    <div><h1>🏛️ Módulo de Préstamos</h1><p style="font-size:13px;color:var(--gray)">Préstamos recibidos — bancos, entidades y personas físicas</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="modalNuevoPrestamo()">➕ Nuevo Préstamo</button>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="stat-card blue">
+      <div class="stat-ico">🏛️</div>
+      <div class="stat-label">Total Préstamos</div>
+      <div class="stat-value">${lista.length}</div>
+      <div class="stat-sub">${lista.filter(p=>p.estado!=='PAGADO').length} activos</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-ico">💸</div>
+      <div class="stat-label">Deuda Pendiente RD$</div>
+      <div class="stat-value" style="font-size:15px">${fmt(totalDeudaRD)}</div>
+      ${totalDeudaUSD>0?`<div class="stat-sub">${fmtUSD(totalDeudaUSD)} USD pendiente</div>`:'<div class="stat-sub">Sin deuda USD</div>'}
+    </div>
+    <div class="stat-card green">
+      <div class="stat-ico">✅</div>
+      <div class="stat-label">Total Pagado RD$</div>
+      <div class="stat-value" style="font-size:15px">${fmt(totalPagadoRD)}</div>
+      <div class="stat-sub">${lista.filter(p=>p.estado==='PAGADO').length} préstamo(s) saldado(s)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 Lista de Préstamos</div>
+    ${lista.length===0?`<div style="text-align:center;padding:40px;color:var(--gray)"><div style="font-size:48px;margin-bottom:12px">🏛️</div><p>No hay préstamos registrados.</p><button class="btn btn-primary" style="margin-top:12px" onclick="modalNuevoPrestamo()">➕ Registrar Primer Préstamo</button></div>`:`
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Nombre / Referencia</th><th>Entidad / Prestamista</th><th>Tipo</th>
+          <th>Monto Original</th><th>Saldo Pendiente</th><th>Próxima Cuota</th>
+          <th>Avance</th><th>Estado</th><th>Acciones</th>
+        </tr></thead>
+        <tbody>
+          ${lista.map(p=>{
+            const saldo=calcSaldoPrestamo(p);
+            const pct=p.monto>0?Math.round((1-saldo/p.monto)*100):100;
+            const prox=getProximaCuota(p);
+            const fmtMon=p.moneda==='USD'?fmtUSD:fmt;
+            return `<tr>
+              <td><div style="font-weight:700">${escHtml(p.nombre)}</div><div style="font-size:11px;color:var(--gray)">${p.tipoAmort==='francesa'?'Amort. Francesa':p.tipoAmort==='lineacredito'?'💳 Línea de Crédito':'Capital Fijo'} · ${p.plazo} meses</div></td>
+              <td><div style="font-weight:600">${escHtml(p.entidad)}</div><div style="font-size:11px;color:var(--gray)">${p.tipoPrestamista==='banco'?'🏦 Banco/Entidad':'👤 Persona física'}</div></td>
+              <td><span style="font-size:11px;font-weight:700;color:var(--blue)">${p.moneda}</span></td>
+              <td style="font-weight:700">${fmtMon(p.monto)}</td>
+              <td style="font-weight:800;color:${saldo>0?'var(--red)':'var(--green)'}">${fmtMon(saldo)}</td>
+              <td>${prox?`<div style="font-size:12px;font-weight:700">${fmtMon(prox.cuota)}</div><div style="font-size:11px;color:var(--gray)">${fmtDate(prox.fecha)}</div>`:'<span style="color:var(--green);font-size:12px">✅ Saldado</span>'}</td>
+              <td>
+                <div style="background:var(--gray3);border-radius:4px;height:8px;width:90px;overflow:hidden">
+                  <div style="background:${pct>=100?'var(--green)':'var(--blue)'};height:100%;width:${Math.min(pct,100)}%;border-radius:4px"></div>
+                </div>
+                <div style="font-size:10px;color:var(--gray);margin-top:2px">${pct}% pagado</div>
+              </td>
+              <td><span class="badge ${p.estado==='PAGADO'?'badge-green':p.estado==='ACTIVO'?'badge-blue':'badge-amber'}">${p.estado||'ACTIVO'}</span></td>
+              <td>
+                <div style="display:flex;gap:4px">
+                  <button class="btn btn-sm" style="background:var(--blue3);color:var(--blue)" onclick="verDetallePrestamo('${p.id}')" title="Ver detalle">🔍</button>
+                  <button class="btn btn-sm" style="background:var(--green2);color:var(--green)" onclick="modalPagarCuota('${p.id}')" title="Registrar pago" ${p.estado==='PAGADO'?'disabled':''}>💳</button>
+                  <button class="btn btn-sm" style="background:var(--amber2);color:var(--amber)" onclick="modalAbonoCapital('${p.id}')" title="Abono a capital" ${p.estado==='PAGADO'?'disabled':''}>➕</button>
+                  <button class="btn btn-sm btn-red" onclick="eliminarPrestamo('${p.id}')" title="Eliminar">🗑</button>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`}
+  </div>`;
+}
+
+// ─── CÁLCULO AMORTIZACIÓN ───────────────────────────────────
+function calcTablaAmortizacion(p){
+  const monto=parseFloat(p.monto||0);
+  const tasaMensual=parseFloat(p.tasa||0)/100/12;
+  const plazo=parseInt(p.plazo||12);
+  const fechaInicio=p.fechaInicio||today();
+  const rows=[];
+
+  if(p.tipoAmort==='francesa'){
+    // Cuota fija: C = M * i*(1+i)^n / ((1+i)^n - 1)
+    let cuotaFija=tasaMensual>0
+      ? monto*(tasaMensual*Math.pow(1+tasaMensual,plazo))/(Math.pow(1+tasaMensual,plazo)-1)
+      : monto/plazo;
+    let saldo=monto;
+    for(let i=1;i<=plazo;i++){
+      const interes=saldo*tasaMensual;
+      const capital=Math.min(cuotaFija-interes,saldo);
+      saldo=Math.max(0,saldo-capital);
+      const fecha=addMeses(fechaInicio,i);
+      rows.push({num:i,fecha,capital:round2(capital),interes:round2(interes),cuota:round2(capital+interes),saldo:round2(saldo)});
+      if(saldo<=0.01)break;
+    }
+  } else if(p.tipoAmort==='lineacredito'){
+    // Línea de crédito: solo intereses mensuales, capital al final
+    // Los abonos a capital reducen el saldo y por tanto el interés mensual
+    let saldo=monto;
+    for(let i=1;i<=plazo;i++){
+      const interes=round2(saldo*tasaMensual);
+      const esUltima=i===plazo;
+      const capital=esUltima?saldo:0;
+      const cuota=esUltima?round2(capital+interes):interes;
+      const fecha=addMeses(fechaInicio,i);
+      rows.push({num:i,fecha,capital:round2(capital),interes,cuota,saldo:round2(esUltima?0:saldo),esUltima});
+      if(esUltima)break;
+    }
+  } else {
+    // Capital fijo
+    const capitalFijo=monto/plazo;
+    let saldo=monto;
+    for(let i=1;i<=plazo;i++){
+      const interes=saldo*tasaMensual;
+      const capital=Math.min(capitalFijo,saldo);
+      saldo=Math.max(0,saldo-capital);
+      const fecha=addMeses(fechaInicio,i);
+      rows.push({num:i,fecha,capital:round2(capital),interes:round2(interes),cuota:round2(capital+interes),saldo:round2(saldo)});
+      if(saldo<=0.01)break;
+    }
   }
-},15000);
+  return rows;
+}
+
+function calcSaldoPrestamo(p){
+  const pagos=p.pagos||[];
+  if(p.tipoAmort==='lineacredito'){
+    // Línea de crédito: solo los abonos a capital y el pago final reducen el saldo
+    const abonosCapital=pagos.filter(x=>x.tipo==='abono').reduce((a,x)=>a+parseFloat(x.monto||0),0);
+    const pagoFinal=pagos.filter(x=>x.tipo==='cuota'&&x.esUltima).reduce((a,x)=>a+parseFloat(x.capital||0),0);
+    return Math.max(0,parseFloat(p.monto||0)-abonosCapital-pagoFinal);
+  }
+  const totalPagadoCapital=pagos.reduce((a,x)=>a+parseFloat(x.capital||0),0);
+  const totalAbonosCapital=pagos.filter(x=>x.tipo==='abono').reduce((a,x)=>a+parseFloat(x.monto||0),0);
+  return Math.max(0,parseFloat(p.monto||0)-totalPagadoCapital-totalAbonosCapital);
+}
+
+function getProximaCuota(p){
+  if(calcSaldoPrestamo(p)<=0.01)return null;
+  const pagados=(p.pagos||[]).filter(x=>x.tipo==='cuota').length;
+  if(p.tipoAmort==='lineacredito'){
+    // Recalcular con saldo actual (puede haber abonos que redujeron capital)
+    const saldoActual=calcSaldoPrestamo(p);
+    const tasaMensual=parseFloat(p.tasa||0)/100/12;
+    const interesActual=round2(saldoActual*tasaMensual);
+    const plazo=parseInt(p.plazo||12);
+    const cuotaNum=pagados+1;
+    const esUltima=cuotaNum>=plazo;
+    const capital=esUltima?saldoActual:0;
+    const cuota=esUltima?round2(capital+interesActual):interesActual;
+    const fecha=addMeses(p.fechaInicio,cuotaNum);
+    return {num:cuotaNum,fecha,capital,interes:interesActual,cuota,saldo:esUltima?0:round2(saldoActual),esUltima};
+  }
+  const tabla=calcTablaAmortizacion(p);
+  const cuotasPendientes=tabla.slice(pagados);
+  return cuotasPendientes.length>0?cuotasPendientes[0]:null;
+}
+
+function round2(n){return Math.round(n*100)/100;}
+function addMeses(fechaStr,meses){
+  const d=new Date(fechaStr+'T12:00:00');
+  d.setMonth(d.getMonth()+meses);
+  return d.toISOString().split('T')[0];
+}
+
+// ─── MODAL NUEVO PRÉSTAMO ───────────────────────────────────
+function modalNuevoPrestamo(pid){
+  const p=pid?DB.prestamos.find(x=>x.id===pid):null;
+  const esEditar=!!p;
+  openModal(esEditar?'✏️ Editar Préstamo':'🏛️ Nuevo Préstamo',`
+    <div class="form-row c2">
+      <div class="form-field"><label class="required">Nombre / Referencia</label>
+        <input type="text" id="pr-nombre" placeholder="Ej: Préstamo BHD vehículos" value="${escHtml(p?.nombre||'')}"></div>
+      <div class="form-field"><label class="required">Tipo de Prestamista</label>
+        <select id="pr-tipo-prestamista">
+          <option value="banco" ${(!p||p.tipoPrestamista==='banco')?'selected':''}>🏦 Banco / Entidad financiera</option>
+          <option value="persona" ${p?.tipoPrestamista==='persona'?'selected':''}>👤 Persona física</option>
+        </select></div>
+    </div>
+    <div class="form-row c2">
+      <div class="form-field"><label class="required">Nombre del Banco / Prestamista</label>
+        <input type="text" id="pr-entidad" placeholder="Ej: Banco Popular, Juan Pérez..." value="${escHtml(p?.entidad||'')}"></div>
+      <div class="form-field"><label>Moneda</label>
+        <select id="pr-moneda">
+          <option value="RD$" ${(!p||p.moneda==='RD$')?'selected':''}>🇩🇴 RD$ (Pesos)</option>
+          <option value="USD" ${p?.moneda==='USD'?'selected':''}>🇺🇸 USD (Dólares)</option>
+        </select></div>
+    </div>
+    <div class="form-row c3">
+      <div class="form-field"><label class="required">Monto del Préstamo</label>
+        <input type="text" id="pr-monto" placeholder="0.00" value="${p?fmtMoneyDisplay(p.monto):''}" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)"></div>
+      <div class="form-field"><label class="required">Tasa de Interés Anual (%)</label>
+        <input type="number" id="pr-tasa" placeholder="Ej: 12.5" min="0" max="100" step="0.01" value="${p?.tasa||''}"></div>
+      <div class="form-field"><label class="required">Plazo (meses)</label>
+        <input type="number" id="pr-plazo" placeholder="Ej: 24" min="1" max="360" value="${p?.plazo||''}"></div>
+    </div>
+    <div class="form-row c2">
+      <div class="form-field"><label class="required">Fecha de Inicio</label>
+        <input type="date" id="pr-fecha" value="${p?.fechaInicio||today()}"></div>
+      <div class="form-field"><label>Tipo de Amortización</label>
+        <select id="pr-tipo-amort">
+          <option value="francesa" ${(!p||p.tipoAmort==='francesa')?'selected':''}>📊 Francesa (cuota fija)</option>
+          <option value="capitalfijo" ${p?.tipoAmort==='capitalfijo'?'selected':''}>📉 Capital fijo (cuota variable)</option>
+          <option value="lineacredito" ${p?.tipoAmort==='lineacredito'?'selected':''}>💳 Línea de Crédito (solo intereses)</option>
+        </select></div>
+    </div>
+    <div class="form-field"><label>Notas / Observaciones</label>
+      <textarea id="pr-notas" rows="2" placeholder="Número de contrato, condiciones especiales...">${escHtml(p?.notas||'')}</textarea></div>
+  `,`<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+     <button class="btn btn-primary" onclick="guardarPrestamo(${esEditar?`'${pid}'`:'null'})">${esEditar?'💾 Actualizar':'✅ Registrar Préstamo'}</button>`);
+}
+
+function guardarPrestamo(pid){
+  const nombre=document.getElementById('pr-nombre')?.value.trim();
+  const entidad=document.getElementById('pr-entidad')?.value.trim();
+  const montoStr=document.getElementById('pr-monto')?.value||'';
+  const monto=parseFloat(montoStr.replace(/,/g,''))||0;
+  const tasa=parseFloat(document.getElementById('pr-tasa')?.value)||0;
+  const plazo=parseInt(document.getElementById('pr-plazo')?.value)||0;
+  const fechaInicio=document.getElementById('pr-fecha')?.value;
+  const tipoAmort=document.getElementById('pr-tipo-amort')?.value||'francesa';
+  const tipoPrestamista=document.getElementById('pr-tipo-prestamista')?.value||'banco';
+  const moneda=document.getElementById('pr-moneda')?.value||'RD$';
+  const notas=document.getElementById('pr-notas')?.value.trim()||'';
+
+  if(!nombre){toast('Ingresa el nombre del préstamo','error');return;}
+  if(!entidad){toast('Ingresa el banco o prestamista','error');return;}
+  if(monto<=0){toast('Ingresa el monto del préstamo','error');return;}
+  if(plazo<=0){toast('Ingresa el plazo en meses','error');return;}
+  if(!fechaInicio){toast('Ingresa la fecha de inicio','error');return;}
+
+  if(!DB.prestamos)DB.prestamos=[];
+
+  if(pid){
+    const idx=DB.prestamos.findIndex(x=>x.id===pid);
+    if(idx>=0){
+      DB.prestamos[idx]={...DB.prestamos[idx],nombre,entidad,monto,tasa,plazo,fechaInicio,tipoAmort,tipoPrestamista,moneda,notas};
+    }
+    toast('Préstamo actualizado ✓','success');
+  } else {
+    DB.prestamos.push({id:uid(),nombre,entidad,monto,tasa,plazo,fechaInicio,tipoAmort,tipoPrestamista,moneda,notas,estado:'ACTIVO',pagos:[]});
+    toast('Préstamo registrado ✓','success');
+  }
+  sDB('prestamos');
+  closeModal();
+  renderPrestamos();
+}
+
+// ─── VER DETALLE + TABLA AMORTIZACIÓN ──────────────────────
+function verDetallePrestamo(pid){
+  const p=DB.prestamos.find(x=>x.id===pid);
+  if(!p)return;
+  const tabla=calcTablaAmortizacion(p);
+  const pagos=p.pagos||[];
+  const cuotasPagadas=pagos.filter(x=>x.tipo==='cuota').length;
+  const abonosCapital=pagos.filter(x=>x.tipo==='abono');
+  const totalAbonosK=abonosCapital.reduce((a,x)=>a+parseFloat(x.monto||0),0);
+  const saldo=calcSaldoPrestamo(p);
+  const totalPagado=pagos.reduce((a,x)=>a+parseFloat(x.monto||0),0);
+  const totalIntereses=pagos.filter(x=>x.tipo==='cuota').reduce((a,x)=>a+parseFloat(x.interes||0),0);
+  const fmtMon=p.moneda==='USD'?fmtUSD:fmt;
+  const pct=p.monto>0?Math.round((1-saldo/p.monto)*100):100;
+
+  openModal(`🔍 Detalle — ${escHtml(p.nombre)}`,`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--blue3);border-radius:8px;padding:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase">Monto Original</div>
+        <div style="font-size:18px;font-weight:900;color:var(--navy)">${fmtMon(p.monto)}</div>
+      </div>
+      <div style="background:${saldo>0?'var(--red2)':'var(--green2)'};border-radius:8px;padding:12px">
+        <div style="font-size:11px;font-weight:700;color:${saldo>0?'var(--red)':'var(--green)'};text-transform:uppercase">Saldo Pendiente</div>
+        <div style="font-size:18px;font-weight:900;color:var(--navy)">${fmtMon(saldo)}</div>
+      </div>
+      <div style="background:var(--green2);border-radius:8px;padding:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase">Total Pagado</div>
+        <div style="font-size:16px;font-weight:800">${fmtMon(totalPagado)}</div>
+        <div style="font-size:11px;color:var(--gray)">Capital + intereses</div>
+      </div>
+      <div style="background:var(--amber2);border-radius:8px;padding:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase">Intereses Pagados</div>
+        <div style="font-size:16px;font-weight:800">${fmtMon(totalIntereses)}</div>
+        <div style="font-size:11px;color:var(--gray)">Abonos capital: ${fmtMon(totalAbonosK)}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);margin-bottom:4px">
+        <span>Progreso de pago</span><span style="font-weight:700">${pct}%</span>
+      </div>
+      <div style="background:var(--gray3);border-radius:6px;height:12px;overflow:hidden">
+        <div style="background:${pct>=100?'var(--green)':'var(--blue)'};height:100%;width:${Math.min(pct,100)}%;border-radius:6px;transition:.5s"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--gray)">🏦 ${escHtml(p.entidad)}</span>
+      <span style="font-size:12px;color:var(--gray)">📅 Inicio: ${fmtDate(p.fechaInicio)}</span>
+      <span style="font-size:12px;color:var(--gray)">📊 Tasa: ${p.tasa}% anual</span>
+      <span style="font-size:12px;color:var(--gray)">⏱ ${p.plazo} meses</span>
+      <span style="font-size:12px;color:var(--gray)">${p.tipoAmort==='francesa'?'Francesa':p.tipoAmort==='lineacredito'?'💳 Línea de Crédito':'Capital Fijo'}</span>
+    </div>
+
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--navy)">📅 Tabla de Amortización</div>
+    <div style="max-height:260px;overflow-y:auto;border:1px solid var(--gray3);border-radius:8px">
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="background:var(--navy);color:#fff;position:sticky;top:0">
+          <th style="padding:7px 8px;text-align:center">#</th>
+          <th style="padding:7px 8px">Fecha</th>
+          <th style="padding:7px 8px;text-align:right">Capital</th>
+          <th style="padding:7px 8px;text-align:right">Interés</th>
+          <th style="padding:7px 8px;text-align:right">Cuota</th>
+          <th style="padding:7px 8px;text-align:right">Saldo</th>
+          <th style="padding:7px 8px;text-align:center">Estado</th>
+        </tr></thead>
+        <tbody>
+          ${tabla.map((r,i)=>{
+            const pagada=i<cuotasPagadas;
+            const esSiguiente=i===cuotasPagadas&&saldo>0.01;
+            return `<tr style="background:${pagada?'#f0fdf4':esSiguiente?'#eff6ff':'#fff'}">
+              <td style="padding:6px 8px;text-align:center;font-weight:700">${r.num}</td>
+              <td style="padding:6px 8px">${fmtDate(r.fecha)}</td>
+              <td style="padding:6px 8px;text-align:right">${r.esUltima?`<span style="color:var(--red);font-weight:800">${fmtMon(r.capital)}</span>`:fmtMon(r.capital)}</td>
+              <td style="padding:6px 8px;text-align:right;color:var(--amber)">${fmtMon(r.interes)}</td>
+              <td style="padding:6px 8px;text-align:right;font-weight:700">${r.esUltima?`<span style="color:var(--red);font-weight:900" title="Cuota final: capital + interés">${fmtMon(r.cuota)} 🏁</span>`:fmtMon(r.cuota)}</td>
+              <td style="padding:6px 8px;text-align:right;color:var(--gray)">${fmtMon(r.saldo)}</td>
+              <td style="padding:6px 8px;text-align:center">
+                ${pagada?'<span style="color:var(--green);font-size:11px;font-weight:700">✅ Pagada</span>':esSiguiente?'<span style="color:var(--blue);font-size:11px;font-weight:700">▶ Próxima</span>':r.esUltima?'<span style="color:var(--red);font-size:11px;font-weight:700">🏁 Final</span>':'<span style="color:var(--gray);font-size:11px">Pendiente</span>'}
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    ${pagos.length>0?`
+    <div style="font-size:13px;font-weight:700;margin:14px 0 8px;color:var(--navy)">💳 Historial de Pagos</div>
+    <div style="max-height:160px;overflow-y:auto;border:1px solid var(--gray3);border-radius:8px">
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="background:var(--navy);color:#fff">
+          <th style="padding:7px 8px">Fecha</th><th style="padding:7px 8px">Tipo</th>
+          <th style="padding:7px 8px;text-align:right">Monto</th><th style="padding:7px 8px">Cuenta</th><th style="padding:7px 8px">Nota</th>
+        </tr></thead>
+        <tbody>
+          ${pagos.map(x=>`<tr>
+            <td style="padding:5px 8px">${fmtDate(x.fecha)}</td>
+            <td style="padding:5px 8px"><span style="font-size:11px;font-weight:700;color:${x.tipo==='abono'?'var(--purple)':'var(--blue)'}">${x.tipo==='abono'?'💰 Abono Capital':'💳 Cuota'}</span></td>
+            <td style="padding:5px 8px;text-align:right;font-weight:700">${fmtMon(x.monto)}</td>
+            <td style="padding:5px 8px;font-size:11px">${escHtml(x.cuenta||'—')}</td>
+            <td style="padding:5px 8px;font-size:11px;color:var(--gray)">${escHtml(x.nota||'—')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`:''}
+  `,`<button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+     <button class="btn btn-primary" onclick="closeModal();modalNuevoPrestamo('${pid}')">✏️ Editar</button>
+     ${saldo>0?`<button class="btn btn-green" onclick="closeModal();modalPagarCuota('${pid}')">💳 Pagar Cuota</button>
+     <button class="btn" style="background:var(--purple2);color:var(--purple)" onclick="closeModal();modalAbonoCapital('${pid}')">➕ Abono Capital</button>`:''}
+  `);
+}
+
+// ─── MODAL PAGAR CUOTA ──────────────────────────────────────
+function modalPagarCuota(pid){
+  const p=DB.prestamos.find(x=>x.id===pid);
+  if(!p)return;
+  const prox=getProximaCuota(p);
+  if(!prox){toast('Este préstamo ya está saldado','success');return;}
+  const fmtMon=p.moneda==='USD'?fmtUSD:fmt;
+  const cuentas=DB.config.cuentas||['Caja General'];
+
+  openModal('💳 Registrar Pago de Cuota',`
+    <div style="background:${prox.esUltima?'var(--red2)':'var(--blue3)'};border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;color:${prox.esUltima?'var(--red)':'var(--blue)'};font-weight:700">Cuota #${prox.num} — ${fmtDate(prox.fecha)}${prox.esUltima?' 🏁 CUOTA FINAL (Capital + Interés)':''}</div>
+      <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap">
+        <span style="font-size:13px">Capital: <strong>${fmtMon(prox.capital)}</strong></span>
+        <span style="font-size:13px">Interés: <strong style="color:var(--amber)">${fmtMon(prox.interes)}</strong></span>
+        <span style="font-size:13px">Total: <strong style="color:var(--blue)">${fmtMon(prox.cuota)}</strong></span>
+      </div>
+    </div>
+    <div class="form-row c2">
+      <div class="form-field"><label class="required">Monto Pagado</label>
+        <input type="text" id="pc-monto" value="${fmtMoneyDisplay(prox.cuota)}" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)"></div>
+      <div class="form-field"><label class="required">Fecha de Pago</label>
+        <input type="date" id="pc-fecha" value="${today()}"></div>
+    </div>
+    ${htmlMonedaBancoCuenta('pc', p.moneda||'RD$')}
+    <div class="form-field"><label>Nota (opcional)</label>
+      <input type="text" id="pc-nota" placeholder="Ej: Transferencia ref. #12345"></div>
+  `,`<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+     <button class="btn btn-green" onclick="guardarPagoCuota('${pid}')">✅ Confirmar Pago</button>`);
+}
+
+function guardarPagoCuota(pid){
+  const p=DB.prestamos.find(x=>x.id===pid);
+  if(!p)return;
+  const prox=getProximaCuota(p);
+  if(!prox)return;
+  const monto=parseFloat((document.getElementById('pc-monto')?.value||'').replace(/,/g,''))||0;
+  const fecha=document.getElementById('pc-fecha')?.value||today();
+  const cuenta=document.getElementById('pc-cuenta')?.value||'';
+  const banco=document.getElementById('pc-banco')?.value||'';
+  const moneda=document.getElementById('pc-moneda')?.value||p.moneda||'RD$';
+  const nota=document.getElementById('pc-nota')?.value.trim()||'';
+  if(monto<=0){toast('Ingresa el monto pagado','error');return;}
+
+  if(!p.pagos)p.pagos=[];
+  p.pagos.push({id:uid(),tipo:'cuota',num:prox.num,monto,capital:prox.capital,interes:prox.interes,esUltima:prox.esUltima||false,fecha,cuenta,nota});
+
+  // Verificar si quedó saldado
+  if(calcSaldoPrestamo(p)<=0.01)p.estado='PAGADO';
+
+  sDB('prestamos');
+  closeModal();
+  toast('Pago registrado ✓','success');
+  renderPrestamos();
+}
+
+// ─── MODAL ABONO A CAPITAL ──────────────────────────────────
+function modalAbonoCapital(pid){
+  const p=DB.prestamos.find(x=>x.id===pid);
+  if(!p)return;
+  const saldo=calcSaldoPrestamo(p);
+  const fmtMon=p.moneda==='USD'?fmtUSD:fmt;
+  const cuentas=DB.config.cuentas||['Caja General'];
+
+  openModal('➕ Abono Extraordinario a Capital',`
+    <div style="background:var(--purple2);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--purple);font-weight:700">Saldo actual del préstamo</div>
+      <div style="font-size:20px;font-weight:900;color:var(--navy)">${fmtMon(saldo)}</div>
+      <div style="font-size:11px;color:var(--gray);margin-top:2px">Este abono reduce directamente el capital pendiente y recalcula las cuotas restantes.</div>
+    </div>
+    <div class="form-row c2">
+      <div class="form-field"><label class="required">Monto del Abono</label>
+        <input type="text" id="ak-monto" placeholder="0.00" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)"></div>
+      <div class="form-field"><label class="required">Fecha</label>
+        <input type="date" id="ak-fecha" value="${today()}"></div>
+    </div>
+    ${htmlMonedaBancoCuenta('ak', p.moneda||'RD$')}
+    <div class="form-field"><label>Nota (opcional)</label>
+      <input type="text" id="ak-nota" placeholder="Ej: Abono extra diciembre"></div>
+  `,`<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+     <button class="btn" style="background:var(--purple);color:#fff" onclick="guardarAbonoCapital('${pid}')">✅ Registrar Abono</button>`);
+}
+
+function guardarAbonoCapital(pid){
+  const p=DB.prestamos.find(x=>x.id===pid);
+  if(!p)return;
+  const monto=parseFloat((document.getElementById('ak-monto')?.value||'').replace(/,/g,''))||0;
+  const fecha=document.getElementById('ak-fecha')?.value||today();
+  const cuenta=document.getElementById('ak-cuenta')?.value||'';
+  const banco=document.getElementById('ak-banco')?.value||'';
+  const moneda=document.getElementById('ak-moneda')?.value||p.moneda||'RD$';
+  const nota=document.getElementById('ak-nota')?.value.trim()||'';
+  const saldo=calcSaldoPrestamo(p);
+  if(monto<=0){toast('Ingresa el monto del abono','error');return;}
+  if(monto>saldo){toast('El abono no puede superar el saldo pendiente: '+saldo.toFixed(2),'error');return;}
+
+  if(!p.pagos)p.pagos=[];
+  p.pagos.push({id:uid(),tipo:'abono',monto,fecha,cuenta,nota});
+  if(calcSaldoPrestamo(p)<=0.01)p.estado='PAGADO';
+
+  sDB('prestamos');
+  closeModal();
+  toast('Abono a capital registrado ✓','success');
+  renderPrestamos();
+}
+
+function eliminarPrestamo(pid){
+  openModal('🗑 Eliminar Préstamo',
+    '<p style="text-align:center;padding:12px 0">¿Estás seguro que deseas eliminar este préstamo y todo su historial de pagos? Esta acción no se puede deshacer.</p>',
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+     <button class="btn btn-red" onclick="DB.prestamos=DB.prestamos.filter(x=>x.id!=='${pid}');sDB('prestamos');closeModal();toast('Préstamo eliminado','success');renderPrestamos()">🗑 Eliminar</button>`);
+}
 </script>
 </body>
 </html>

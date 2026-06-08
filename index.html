@@ -12551,28 +12551,10 @@ window.fbIniciar = async function(){
     if(loaded){
       setStatus('#22c55e','✓ Firebase');
       window._fbCargado=true;
-      // Activar listeners de tiempo real
-      // NO activar listeners aquí — ya se activan en _entrarDashboard
       if(typeof actualizarLogoSidebar==='function') actualizarLogoSidebar();
-      // Actualizar topbar empresa
       const _empFb=document.getElementById('topbar-empresa');
       if(_empFb&&DB.config.empresa)_empFb.textContent=DB.config.empresa;
-      // Aplicar colores inmediatamente tras cargar Firebase
       if(typeof aplicarColoresSistema==='function'&&DB.config.colores)aplicarColoresSistema();
-      // Re-renderizar CUALQUIER página activa con los datos de Firebase
-      const _activePage=document.querySelector('.page.active');
-      if(_activePage){
-        const _pid=_activePage.id.replace('page-','');
-        const _renderMap={
-          dashboard:renderDashboard,inventario:renderInventario,
-          gastosVeh:renderGastosVeh,cxp:renderCXP,cxc:renderCXC,
-          ventas:renderVentas,clientes:renderClientes,suplidores:renderSuplidores,
-          gastos:renderGastos,nomina:renderNomina,caja:renderCaja,
-          cotizaciones:renderCotizaciones,autorizaciones:renderAutorizaciones,
-          usuarios:renderUsuarios,config:renderConfig,informes:renderInformes
-        };
-        if(_renderMap[_pid])setTimeout(_renderMap[_pid],300);
-      }
     } else {
       // Fix 4B — solo subir si hay datos reales, no sobreescribir Firebase con vacío
       const hayDatosReales=

@@ -652,6 +652,12 @@ function doLogin(){
         }
       },3000);
     }
+    // Activar listeners DESPUÉS del render — snapshots ya no borran el contenido
+    setTimeout(()=>{
+      if(window._fbActivo&&typeof fbActivarListeners==='function'){
+        fbActivarListeners();
+      }
+    },1500);
   };
   // Mostrar bienvenida con datos del localStorage primero
   _actualizarWelcome();
@@ -11823,7 +11829,8 @@ function _iniciarConFirebase(){
       clearTimeout(safetyTimeout);
       window._fbActivo=true;
       window._fbCargado=true;
-      if(typeof fbActivarListeners==='function') fbActivarListeners();
+      // NO activar listeners aquí — se activan después del login en _entrarDashboard
+      // para evitar que los onSnapshot borren el contenido recién renderizado
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
       const _dot=document.getElementById('fb-dot');
       const _txt=document.getElementById('fb-text');
@@ -12545,8 +12552,7 @@ window.fbIniciar = async function(){
       setStatus('#22c55e','✓ Firebase');
       window._fbCargado=true;
       // Activar listeners de tiempo real
-      if(typeof fbActivarListeners==='function') fbActivarListeners();
-      // Actualizar sidebar con logo de Firebase
+      // NO activar listeners aquí — ya se activan en _entrarDashboard
       if(typeof actualizarLogoSidebar==='function') actualizarLogoSidebar();
       // Actualizar topbar empresa
       const _empFb=document.getElementById('topbar-empresa');

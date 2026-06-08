@@ -635,6 +635,7 @@ function doLogin(){
     if(emp&&DB.config.empresa)emp.textContent=DB.config.empresa;
     aplicarPermisosNav();
     if(DB.config?.colores)aplicarColoresSistema();
+    // Retry colores por si Firebase aún no terminó
     setTimeout(()=>{if(DB.config?.colores)aplicarColoresSistema();},500);
     setTimeout(()=>{if(DB.config?.colores)aplicarColoresSistema();},1500);
     actualizarLogoSidebar();
@@ -652,12 +653,6 @@ function doLogin(){
         }
       },3000);
     }
-    // Activar listeners DESPUÉS del render — snapshots ya no borran el contenido
-    setTimeout(()=>{
-      if(window._fbActivo&&typeof fbActivarListeners==='function'){
-        fbActivarListeners();
-      }
-    },1500);
   };
   // Mostrar bienvenida con datos del localStorage primero
   _actualizarWelcome();
@@ -1129,6 +1124,7 @@ function showPage(id){
   document.getElementById('page-'+id)?.classList.add('active');
   document.getElementById('nav-'+id)?.classList.add('active');
   if(r[id])r[id]();
+  setTimeout(()=>{try{const pg=document.getElementById('page-'+id);if(pg)autoFormatFields(pg);}catch{}},120);
 }
 
 function showNotif(title,msg,type='danger'){
@@ -11820,6 +11816,18 @@ document.addEventListener('DOMContentLoaded',()=>{
 document.getElementById('li-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('li-user').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('li-pass').focus();});
 function _iniciarConFirebase(){
+  // Si se abre localmente (file://) no intentar Firebase — entrar directo
+  if(window.location.protocol==='file:'){
+    window._fbActivo=false;
+    window._fbCargado=true; // Permite entrar con datos locales
+    const btn=document.querySelector('.btn-login');
+    if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
+    const _dot=document.getElementById('fb-dot');
+    const _txt=document.getElementById('fb-text');
+    if(_dot)_dot.style.background='#94a3b8';
+    if(_txt)_txt.textContent='Modo local';
+    return;
+  }
   if(typeof fbCargar==='function'){
     const btn=document.querySelector('.btn-login');
     const safetyTimeout=setTimeout(()=>{
@@ -11829,8 +11837,7 @@ function _iniciarConFirebase(){
       clearTimeout(safetyTimeout);
       window._fbActivo=true;
       window._fbCargado=true;
-      // NO activar listeners aquí — se activan después del login en _entrarDashboard
-      // para evitar que los onSnapshot borren el contenido recién renderizado
+      if(typeof fbActivarListeners==='function') fbActivarListeners();
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
       const _dot=document.getElementById('fb-dot');
       const _txt=document.getElementById('fb-text');
@@ -12551,10 +12558,29 @@ window.fbIniciar = async function(){
     if(loaded){
       setStatus('#22c55e','✓ Firebase');
       window._fbCargado=true;
+      // Activar listeners de tiempo real
+      if(typeof fbActivarListeners==='function') fbActivarListeners();
+      // Actualizar sidebar con logo de Firebase
       if(typeof actualizarLogoSidebar==='function') actualizarLogoSidebar();
+      // Actualizar topbar empresa
       const _empFb=document.getElementById('topbar-empresa');
       if(_empFb&&DB.config.empresa)_empFb.textContent=DB.config.empresa;
+      // Aplicar colores inmediatamente tras cargar Firebase
       if(typeof aplicarColoresSistema==='function'&&DB.config.colores)aplicarColoresSistema();
+      // Re-renderizar CUALQUIER página activa con los datos de Firebase
+      const _activePage=document.querySelector('.page.active');
+      if(_activePage){
+        const _pid=_activePage.id.replace('page-','');
+        const _renderMap={
+          dashboard:renderDashboard,inventario:renderInventario,
+          gastosVeh:renderGastosVeh,cxp:renderCXP,cxc:renderCXC,
+          ventas:renderVentas,clientes:renderClientes,suplidores:renderSuplidores,
+          gastos:renderGastos,nomina:renderNomina,caja:renderCaja,
+          cotizaciones:renderCotizaciones,autorizaciones:renderAutorizaciones,
+          usuarios:renderUsuarios,config:renderConfig,informes:renderInformes
+        };
+        if(_renderMap[_pid])setTimeout(_renderMap[_pid],300);
+      }
     } else {
       // Fix 4B — solo subir si hay datos reales, no sobreescribir Firebase con vacío
       const hayDatosReales=

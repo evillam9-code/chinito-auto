@@ -653,6 +653,10 @@ function doLogin(){
         }
       },3000);
     }
+    // Activar listeners DESPUÉS del render del dashboard
+    setTimeout(()=>{
+      if(window._fbActivo&&typeof fbActivarListeners==='function') fbActivarListeners();
+    },1500);
   };
   // Mostrar bienvenida con datos del localStorage primero
   _actualizarWelcome();
@@ -11837,7 +11841,7 @@ function _iniciarConFirebase(){
       clearTimeout(safetyTimeout);
       window._fbActivo=true;
       window._fbCargado=true;
-      if(typeof fbActivarListeners==='function') fbActivarListeners();
+      // Listeners se activan en _entrarDashboard después del login
       if(btn){btn.textContent='Ingresar al sistema →';btn.disabled=false;}
       const _dot=document.getElementById('fb-dot');
       const _txt=document.getElementById('fb-text');
@@ -12558,14 +12562,10 @@ window.fbIniciar = async function(){
     if(loaded){
       setStatus('#22c55e','✓ Firebase');
       window._fbCargado=true;
-      // Activar listeners de tiempo real
-      if(typeof fbActivarListeners==='function') fbActivarListeners();
-      // Actualizar sidebar con logo de Firebase
+      // Listeners se activan en _entrarDashboard después del login
       if(typeof actualizarLogoSidebar==='function') actualizarLogoSidebar();
-      // Actualizar topbar empresa
       const _empFb=document.getElementById('topbar-empresa');
       if(_empFb&&DB.config.empresa)_empFb.textContent=DB.config.empresa;
-      // Aplicar colores inmediatamente tras cargar Firebase
       if(typeof aplicarColoresSistema==='function'&&DB.config.colores)aplicarColoresSistema();
       // Re-renderizar CUALQUIER página activa con los datos de Firebase
       const _activePage=document.querySelector('.page.active');

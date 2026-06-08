@@ -626,8 +626,6 @@ function doLogin(){
   // Función para entrar al dashboard
   const _entrarDashboard=()=>{
     ws.classList.remove('show');
-    const ls=document.getElementById('login-screen');
-    if(ls){ls.style.display='none';ls.style.visibility='hidden';}
     document.getElementById('app').style.display='flex';
     document.getElementById('top-username').textContent=user.nombre;
     document.getElementById('topbar-nombre').textContent=user.nombre;
@@ -640,13 +638,20 @@ function doLogin(){
     setTimeout(()=>{if(DB.config?.colores)aplicarColoresSistema();},500);
     setTimeout(()=>{if(DB.config?.colores)aplicarColoresSistema();},1500);
     actualizarLogoSidebar();
-    // logBit solo si Firebase está activo para evitar errores locales
-    if(window._fbActivo)try{logBit('Sesión','Inició sesión','—');}catch(e){}
+    logBit('Sesión','Inició sesión','—');
     showPage('dashboard');
     setTimeout(checkAlerts,1500);
     _iniciarPresenciaGlobal();
     setTimeout(_verificarBackupAdmin,2500);
     setTimeout(_verificarCumpleanosHoy,3500);
+    // Sistema de versiones — admin publica la versión actual del código
+    if(currentUser?.role==='admin'){
+      setTimeout(async function(){
+        if(typeof publicarVersionActual==='function'&&window._fbActivo){
+          await publicarVersionActual();
+        }
+      },3000);
+    }
   };
   // Mostrar bienvenida con datos del localStorage primero
   _actualizarWelcome();
@@ -1107,18 +1112,17 @@ function showPage(id){
   // Limpiar intervalo de usuarios si navegamos a otra página
   if(id!=='usuarios'&&window._usuariosRefreshInterval){clearInterval(window._usuariosRefreshInterval);window._usuariosRefreshInterval=null;}
   const r={dashboard:renderDashboard,inventario:renderInventario,ventas:renderVentas,cotizaciones:renderCotizaciones,clientes:renderClientes,suplidores:renderSuplidores,caja:renderCaja,gastos:renderGastos,nomina:renderNomina,informes:renderInformes,usuarios:renderUsuarios,config:renderConfig,gastosVeh:renderGastosVeh,cxp:renderCXP,cxc:renderCXC,autorizaciones:renderAutorizaciones,seguros:renderSeguros,facturaExterna:renderFacturaExterna,alertas:renderAlertas,chat:renderChat,cuentasBancarias:renderCuentasBancarias,cumpleanos:renderCumpleanos,backup:renderBackup,bitacora:renderBitacora,prestamos:renderPrestamos};
-  // Refresh Firebase solo si está activo Y ha pasado tiempo — nunca bloquear render
+  // Refresh Firebase si han pasado más de 60 segundos
   const ahora=Date.now();
   if(window._fbActivo&&window._fbCargado&&(!window._lastFbRefresh||ahora-window._lastFbRefresh>60000)){
     window._lastFbRefresh=ahora;
-    if(typeof fbCargar==='function')fbCargar().then(()=>{if(r[id])r[id]();}).catch(()=>{if(r[id])r[id]();});
+    if(typeof fbCargar==='function')fbCargar().then(()=>{if(r[id])r[id]();}).catch(()=>{});
   }
   // Verificar acceso al módulo (solo para no-admin)
   if(id!=='dashboard'&&currentUser?.role!=='admin'&&!canAccess(id)){toast('No tienes acceso a este módulo','error');return;}
   document.getElementById('page-'+id)?.classList.add('active');
   document.getElementById('nav-'+id)?.classList.add('active');
   if(r[id])r[id]();
-  setTimeout(()=>{try{const pg=document.getElementById('page-'+id);if(pg)autoFormatFields(pg);}catch{}},120);
 }
 
 function showNotif(title,msg,type='danger'){
@@ -11797,9 +11801,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(liUser){liUser.disabled=false;liUser.style.pointerEvents='';}
   if(liPass){liPass.disabled=false;liPass.style.pointerEvents='';}
   if(btnLogin){btnLogin.disabled=false;btnLogin.textContent='Ingresar al sistema →';btnLogin.style.pointerEvents='';}
-  // Ocultar welcome-screen si quedó visible por error
-  const ws2=document.getElementById('welcome-screen');
-  if(ws2&&ws2.classList.contains('show')&&!window.currentUser){ws2.classList.remove('show');}
+  // Ocultar welcome-screen si quedó visible
+  const ws=document.getElementById('welcome-screen');
+  if(ws){ws.style.display='none';ws.classList.remove('show');}
   // Eliminar modal de error Firebase si quedó
   const fbErr=document.getElementById('fb-error-modal');
   if(fbErr)fbErr.remove();
@@ -12540,11 +12544,16 @@ window.fbIniciar = async function(){
     if(loaded){
       setStatus('#22c55e','✓ Firebase');
       window._fbCargado=true;
+      // Activar listeners de tiempo real
       if(typeof fbActivarListeners==='function') fbActivarListeners();
+      // Actualizar sidebar con logo de Firebase
       if(typeof actualizarLogoSidebar==='function') actualizarLogoSidebar();
+      // Actualizar topbar empresa
       const _empFb=document.getElementById('topbar-empresa');
       if(_empFb&&DB.config.empresa)_empFb.textContent=DB.config.empresa;
+      // Aplicar colores inmediatamente tras cargar Firebase
       if(typeof aplicarColoresSistema==='function'&&DB.config.colores)aplicarColoresSistema();
+      // Re-renderizar CUALQUIER página activa con los datos de Firebase
       const _activePage=document.querySelector('.page.active');
       if(_activePage){
         const _pid=_activePage.id.replace('page-','');

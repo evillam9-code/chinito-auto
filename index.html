@@ -2655,7 +2655,7 @@ function renderUsuarios(){
     {id:'alertas',label:'Alertas'},{id:'verSaldoCaja',label:'💰 Saldo Caja'},
     {id:'chat',label:'💬 Chat'},{id:'usuarios',label:'Usuarios'},
     {id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},{id:'config',label:'Configuración'},
-    {id:'cumpleanos',label:'🎂 Cumpleaños'},
+    {id:'cumpleanos',label:'🎂 Cumpleaños'},{id:'prestamos',label:'🏛️ Préstamos'},
   ];
   const BORRAR=[
     {id:'ventas',label:'Borrar Ventas'},{id:'clientes',label:'Borrar Clientes'},
@@ -2876,7 +2876,7 @@ function editarUsuario(i){
     {id:'nomina',label:'👷 Nómina'},{id:'caja',label:'💳 Caja'},
     {id:'cotizaciones',label:'📋 Cotizaciones'},{id:'autorizaciones',label:'📝 Autorización Compra'},
     {id:'seguros',label:'🛡️ Seguros'},{id:'facturaExterna',label:'🧾 Facturas Externas'},{id:'alertas',label:'🔔 Alertas'},{id:'verSaldoCaja',label:'💰 Ver Saldo Caja'},{id:'chat',label:'💬 Chat Interno'},{id:'cuentasBancarias',label:'🏦 Cuentas Bancarias'},
-    {id:'cumpleanos',label:'🎂 Cumpleaños'},
+    {id:'cumpleanos',label:'🎂 Cumpleaños'},{id:'prestamos',label:'🏛️ Préstamos'},
   ];
   const mods=u.modulos||[];
   const perms=u.permisos||{};
@@ -2910,6 +2910,7 @@ function editarUsuario(i){
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:5px;background:#fff;border-radius:6px;border:1px solid var(--gray3)"><input type="checkbox" id="u-perm-eliminar" ${perms.eliminar||u.role==='admin'?'checked':''} style="accent-color:var(--red)"> 🗑 Eliminar</label>
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:5px;background:#fff;border-radius:6px;border:1px solid var(--gray3)"><input type="checkbox" id="u-perm-imprimir" ${perms.imprimir||u.role==='admin'?'checked':''} style="accent-color:var(--green)"> 🖨️ Imprimir</label>
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:5px;background:#fff;border-radius:6px;border:1px solid var(--gray3)"><input type="checkbox" id="u-perm-pdf" ${perms.pdf||u.role==='admin'?'checked':''} style="accent-color:var(--amber)"> 📄 PDF</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:5px;background:#dcfce7;border-radius:6px;border:1px solid var(--green)"><input type="checkbox" id="u-perm-prestamoOtorgar" ${perms.prestamoOtorgar||u.role==='admin'?'checked':''} style="accent-color:var(--green)"> 🏛️ Otorgar Préstamos</label>
       </div>
       <div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--gray);text-transform:uppercase">✏️ Permisos de Editar por módulo:</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px">
@@ -2973,7 +2974,7 @@ function guardarUsuario(idx){
   if(idx===undefined&&DB.users.find(u=>u.username===user)){toast('El usuario ya existe','error');return;}
   const MODS_IDS=['dashboard','informes','suplidores','inventario','gastosVeh','cxp','clientes','ventas','cxc','gastos','nomina','caja','cotizaciones','autorizaciones','seguros','facturaExterna','alertas','verSaldoCaja','chat','cuentasBancarias','cumpleanos','prestamos'];
   const nuevosMods=MODS_IDS.filter(m=>{const el=document.getElementById('u-mod-'+m);return el&&el.checked;});
-  const permKeys=['editar','eliminar','imprimir','pdf','editarVentas','editarClientes','editarSuplidores','editarGastos','editarNomina','editarGastosVeh','editarCobros','editarCxP','editarVehiculos','editarCaja','editarCotizaciones','editarAutorizaciones','editarSeguros','editarFacturas','borrarVentas','borrarClientes','borrarSuplidores','borrarGastos','borrarNomina','borrarGastosVeh','borrarCobros','borrarCxP','borrarVehiculos','borrarCaja','borrarCotizaciones','borrarAutorizaciones','borrarSeguros','borrarFacturas'];
+  const permKeys=['editar','eliminar','imprimir','pdf','editarVentas','editarClientes','editarSuplidores','editarGastos','editarNomina','editarGastosVeh','editarCobros','editarCxP','editarVehiculos','editarCaja','editarCotizaciones','editarAutorizaciones','editarSeguros','editarFacturas','borrarVentas','borrarClientes','borrarSuplidores','borrarGastos','borrarNomina','borrarGastosVeh','borrarCobros','borrarCxP','borrarVehiculos','borrarCaja','borrarCotizaciones','borrarAutorizaciones','borrarSeguros','borrarFacturas','prestamoOtorgar'];
   const nuevosPerms={};permKeys.forEach(k=>{const el=document.getElementById('u-perm-'+k);if(el)nuevosPerms[k]=el.checked;});
   if(idx!==undefined){
     DB.users[idx].nombre=nombre;
@@ -8664,7 +8665,7 @@ function renderCXC(){
         ${(currentUser?.role==='admin'||canDo('eliminar'))?`<button id="cxc-btn-eliminar" disabled class="btn btn-sm" style="${ds}" onclick="cxcAccion('eliminar')">🗑 Eliminar</button>`:''}
         <div style="width:1px;height:28px;background:var(--gray3);margin:0 2px"></div>
         <button class="btn btn-secondary btn-sm" onclick="imprimirCXC()">📄 PDF</button>
-        ${(currentUser?.role==='admin'||canDo('editar'))?`<button class="btn btn-primary" onclick="nuevaCXCManual()">➕ Nueva CxC</button> <button class="btn btn-sm" style="background:var(--green);color:#fff" onclick="nuevaPrestamoOtorgado()">🤝 Préstamo Otorgado</button>`:''}
+        ${(currentUser?.role==='admin'||canDo('editar'))?`<button class="btn btn-primary" onclick="nuevaCXCManual()">➕ Nueva CxC</button>`:''} ${(currentUser?.role==='admin'||(currentUser?.permisos||{}).prestamoOtorgar)?`<button class="btn btn-sm" style="background:var(--green);color:#fff" onclick="nuevaPrestamoOtorgado()">🤝 Préstamo Otorgado</button>`:''}
       </div>
     </div>
 
@@ -10535,7 +10536,7 @@ function renderPrestamos(){
   <div class="page-header">
     <div><h1>🏛️ Módulo de Préstamos</h1><p style="font-size:13px;color:var(--gray)">Préstamos recibidos — bancos, entidades y personas físicas</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="modalNuevoPrestamo()">➕ Nuevo Préstamo</button>
+      ${(currentUser?.role==='admin'||(currentUser?.permisos||{}).prestamoOtorgar)?'<button class="btn btn-primary" onclick="modalNuevoPrestamo()">➕ Nuevo Préstamo</button>':''}
     </div>
   </div>
 
@@ -12246,7 +12247,7 @@ function renderPrestamos(){
   <div class="page-header">
     <div><h1>🏛️ Módulo de Préstamos</h1><p style="font-size:13px;color:var(--gray)">Préstamos recibidos — bancos, entidades y personas físicas</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="modalNuevoPrestamo()">➕ Nuevo Préstamo</button>
+      ${(currentUser?.role==='admin'||(currentUser?.permisos||{}).prestamoOtorgar)?'<button class="btn btn-primary" onclick="modalNuevoPrestamo()">➕ Nuevo Préstamo</button>':''}
     </div>
   </div>
 

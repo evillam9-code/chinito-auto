@@ -837,6 +837,11 @@ function feriaRefreshSilente(){
   const sel=document.getElementById('feria-veh-sel');
   const vid=sel?sel.value:'';
   const panel=document.getElementById('feria-car-panel');
+  // Si el admin tiene un vehículo seleccionado en Configurar Extras, refrescar ese form también
+  const adminVid=window._feriaAdminVehId;
+  if(adminVid&&document.getElementById('feria-admin-form')?.style.display!=='none'){
+    feriaSelAdmin(adminVid, null);
+  }
 
   // Re-calcular contador de ventas en el header
   const ventas=DB.feria&&DB.feria.ventas||[];
@@ -1623,9 +1628,14 @@ function feriaGuardarExtras(){
     if(opt&&v)opt.textContent=v.codigo+' — '+v.marca+' '+v.modelo+' '+(v.anio||'')+(ex.precioFeria?' ✓':' (sin configurar)');
     adminSel.value=vid;
   }
-  // Repoblar el formulario completo desde DB para reflejar lo que se guardó
-  // (incluyendo campos que quedaron vacíos al borrar)
+  // Repoblar el formulario desde DB (refleja borrados y cambios)
   feriaSelAdmin(vid, null);
+  // También refrescar Vista Vendedor si ese vehículo estaba cargado
+  if(window._feriaVehActivo&&window._feriaVehActivo.id===vid){
+    feriaCargarVehiculo(vid);
+    const sel=document.getElementById('feria-veh-sel');
+    if(sel)sel.value=vid;
+  }
 }
 
 function _crearCotizacionFeria(venta){
@@ -13068,7 +13078,7 @@ function iniciarVerificadorVersion(){
 function fbActivarListeners(){
   const keys=['config','config_logo','users','vehiculos','clientes','suplidores',
     'ventas','cotizaciones','caja','gastos','nomina','nominaPagos',
-    'gastosVehiculos','cxp','cxc','autorizaciones','presencia','chat'];
+    'gastosVehiculos','cxp','cxc','autorizaciones','presencia','chat','feria'];
   
   keys.forEach(key=>{
     _fbDB.collection(_fbCol).doc(key).onSnapshot(snap=>{
@@ -13164,6 +13174,7 @@ function fbActivarListeners(){
           usuarios:()=>typeof renderUsuarios==='function'&&renderUsuarios(),
           config:()=>typeof renderConfig==='function'&&renderConfig(),
           informes:()=>typeof renderInformes==='function'&&renderInformes(),
+          feria:()=>typeof feriaRefreshSilente==='function'&&feriaRefreshSilente(),
         };
         // Solo re-renderizar si el key afecta la página activa
         const keysParaPagina={

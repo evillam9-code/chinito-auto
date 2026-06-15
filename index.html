@@ -850,11 +850,13 @@ function feriaRefreshSilente(){
   const subtitleEl=document.querySelector('#page-feria .page-header p');
   if(subtitleEl)subtitleEl.textContent=ventas.length+' venta(s) registrada(s) — Total: '+fmt(totalVentas);
 
-  // Si hay un vehículo seleccionado en la Vista Vendedor, refrescar su panel
-  if(vid&&panel&&panel.style.display!=='none'){
-    feriaCargarVehiculo(vid);
-    // Restaurar el valor del selector (feriaCargarVehiculo no lo toca)
-    if(sel)sel.value=vid;
+  // Si hay un vehículo activo en la Vista Vendedor, refrescar su panel
+  const vidActivo=window._feriaVehActivo?.id||vid;
+  if(vidActivo){
+    feriaCargarVehiculo(vidActivo);
+    // Restaurar el valor del selector
+    const selRestore=document.getElementById('feria-veh-sel');
+    if(selRestore)selRestore.value=vidActivo;
   }
 
   // Si estamos en Historial, actualizar el contador
@@ -13275,7 +13277,8 @@ window.fbIniciar = async function(){
           ventas:renderVentas,clientes:renderClientes,suplidores:renderSuplidores,
           gastos:renderGastos,nomina:renderNomina,caja:renderCaja,
           cotizaciones:renderCotizaciones,autorizaciones:renderAutorizaciones,
-          usuarios:renderUsuarios,config:renderConfig,informes:renderInformes
+          usuarios:renderUsuarios,config:renderConfig,informes:renderInformes,
+          feria:renderFeria
         };
         if(_renderMap[_pid])setTimeout(_renderMap[_pid],300);
       }

@@ -7364,8 +7364,14 @@ function nuevaVenta(){
           <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Kilometraje</label><input type="text" id="sv-rec-km" placeholder="0" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div>
         </div>
-        <div class="form-row c2" style="margin-bottom:0">
+        <div class="form-row c3" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Monto Recibido</label><input type="text" id="sv-rec-monto" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Moneda</label>
+            <select id="sv-rec-moneda">
+              <option value="RD$">RD$ — Pesos</option>
+              <option value="USD">USD — Dólares</option>
+            </select>
+          </div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
             <input type="file" id="sv-rec-matricula" accept=".jpg,.jpeg,.png" onchange="previewFoto('sv-rec-matricula','sv-rec-mat-prev')">
             <img id="sv-rec-mat-prev" style="display:none;width:100%;max-height:60px;object-fit:cover;border-radius:4px;margin-top:4px">
@@ -7766,8 +7772,9 @@ function confirmarVenta(nf){
     const recVin=document.getElementById('sv-rec-vin')?.value||'';
     const recKm=parseFloat((document.getElementById('sv-rec-km')?.value||'0').replace(/,/g,''))||0;
     const recMonto=parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,''));
+    const recMoneda=document.getElementById('sv-rec-moneda')?.value||'RD$';
     const recMatricula=matEl?.style.display!=='none'&&matEl?.src?matEl.src:'';
-    venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,km:recKm,monto:recMonto,matricula:recMatricula};
+    venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,km:recKm,monto:recMonto,monedaRec:recMoneda,matricula:recMatricula};
     // Registrar automáticamente como vehículo activo tipo RECIBIDO
     if(recVehNombre){
       // Parsear marca, modelo, año del texto libre
@@ -7793,9 +7800,9 @@ function confirmarVenta(nf){
           status:'ACTIVO',
           tipoCompra:'RECIBIDO',
           suplidor:cliNombre, // El cliente que lo entregó
-          costo:recMonto,     // El valor por el que se recibió
+          costo:recMoneda==='USD'?recMonto*parseFloat(DB.config.tasaCambio||60):recMonto,     // Costo en RD$ (convertido si se recibió en USD)
           fecha:venta.fecha,
-          notas:`Recibido como parte de pago. Venta: ${nf} — Cliente: ${cliNombre}`,
+          notas:`Recibido como parte de pago. Venta: ${nf} — Cliente: ${cliNombre}. Valor recibido: ${recMoneda==='USD'?'$'+recMonto.toLocaleString('en-US',{minimumFractionDigits:2})+' USD':'RD$'+recMonto.toLocaleString('es-DO',{minimumFractionDigits:2})}`,
           propietario:DB.config.propietarios?.[0]||'',
           color:'',placa:'',carfax:'',foto:'',precioVenta:0,
           origenVenta:nf // referencia a la venta de origen
@@ -8051,8 +8058,14 @@ function nuevaVenta(){
           <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Kilometraje</label><input type="text" id="sv-rec-km" placeholder="0" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div>
         </div>
-        <div class="form-row c2" style="margin-bottom:0">
+        <div class="form-row c3" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Monto Recibido</label><input type="text" id="sv-rec-monto" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Moneda</label>
+            <select id="sv-rec-moneda">
+              <option value="RD$">RD$ — Pesos</option>
+              <option value="USD">USD — Dólares</option>
+            </select>
+          </div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
             <input type="file" id="sv-rec-matricula" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('sv-rec-matricula','sv-rec-mat-prev')">
             <img id="sv-rec-mat-prev" style="display:none;width:100%;max-height:60px;object-fit:cover;border-radius:4px;margin-top:4px">
@@ -8308,8 +8321,9 @@ function confirmarVenta(nf){
     const recVin=document.getElementById('sv-rec-vin')?.value||'';
     const recKm=parseFloat((document.getElementById('sv-rec-km')?.value||'0').replace(/,/g,''))||0;
     const recMonto=parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,''));
+    const recMoneda=document.getElementById('sv-rec-moneda')?.value||'RD$';
     const recMatricula=matEl?.style.display!=='none'&&matEl?.src?matEl.src:'';
-    venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,km:recKm,monto:recMonto,matricula:recMatricula};
+    venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,km:recKm,monto:recMonto,monedaRec:recMoneda,matricula:recMatricula};
     // Registrar automáticamente como vehículo activo tipo RECIBIDO
     if(recVehNombre){
       // Parsear marca, modelo, año del texto libre
@@ -8335,9 +8349,9 @@ function confirmarVenta(nf){
           status:'ACTIVO',
           tipoCompra:'RECIBIDO',
           suplidor:cliNombre, // El cliente que lo entregó
-          costo:recMonto,     // El valor por el que se recibió
+          costo:recMoneda==='USD'?recMonto*parseFloat(DB.config.tasaCambio||60):recMonto,     // Costo en RD$ (convertido si se recibió en USD)
           fecha:venta.fecha,
-          notas:`Recibido como parte de pago. Venta: ${nf} — Cliente: ${cliNombre}`,
+          notas:`Recibido como parte de pago. Venta: ${nf} — Cliente: ${cliNombre}. Valor recibido: ${recMoneda==='USD'?'$'+recMonto.toLocaleString('en-US',{minimumFractionDigits:2})+' USD':'RD$'+recMonto.toLocaleString('es-DO',{minimumFractionDigits:2})}`,
           propietario:DB.config.propietarios?.[0]||'',
           color:'',placa:'',carfax:'',foto:'',precioVenta:0,
           origenVenta:nf // referencia a la venta de origen
@@ -8630,6 +8644,38 @@ function editarVenta(vid){
         </div>
       </div>
     </div>
+    <div style="background:var(--gray2);border-radius:8px;padding:12px;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700">🔄 Vehículo Recibido como Parte de Pago</div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="sv-tiene-recibido" ${rec.vehiculo?'checked':''} onchange="toggleVehRecibido()" style="width:16px;height:16px">
+          <span style="font-size:12px;font-weight:600">Incluir vehículo recibido</span>
+        </label>
+      </div>
+      <div id="sv-recibido-fields" style="display:${rec.vehiculo?'block':'none'}">
+        <div class="form-row c3" style="margin-bottom:8px">
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Marca / Modelo</label><input type="text" id="sv-rec-vehiculo" value="${escHtml(rec.vehiculo||'')}" placeholder="Ej: Toyota Corolla 2018"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" value="${escHtml(rec.vin||'')}" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Kilometraje</label><input type="text" id="sv-rec-km" value="${rec.km||0}" placeholder="0" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div>
+        </div>
+        <div class="form-row c3" style="margin-bottom:0">
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Monto Recibido</label><input type="text" id="sv-rec-monto" value="${rec.monto||0}" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Moneda</label>
+            <select id="sv-rec-moneda">
+              <option value="RD$" ${(rec.monedaRec||'RD$')!=='USD'?'selected':''}>RD$ — Pesos</option>
+              <option value="USD" ${rec.monedaRec==='USD'?'selected':''}>USD — Dólares</option>
+            </select>
+          </div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
+            <input type="file" id="sv-rec-matricula" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('sv-rec-matricula','sv-rec-mat-prev')">
+            ${rec.matricula?`<img id="sv-rec-mat-prev" src="${rec.matricula}" style="display:block;width:100%;max-height:60px;object-fit:cover;border-radius:4px;margin-top:4px">`:`<img id="sv-rec-mat-prev" style="display:none;width:100%;max-height:60px;object-fit:cover;border-radius:4px;margin-top:4px">`}
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--blue);padding:8px;background:#fff;border-radius:6px;margin-top:8px">
+          ℹ️ Al guardar, esto también actualiza el costo del vehículo recibido ya registrado en Inventario.
+        </div>
+      </div>
+    </div>
     <div class="form-field" style="margin-top:8px"><label>🔢 Millaje al Momento de Venta</label>
       <input type="text" id="sv-millaje-venta" value="${v.millajeVenta||0}" placeholder="Ej: 45,230" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)">
     </div>
@@ -8692,6 +8738,33 @@ function guardarEditarVenta(vid){
   DB.ventas[i].comentario=document.getElementById('sv-comentario')?.value||'';
   DB.ventas[i].garantia=document.getElementById('sv-garantia')?.value.trim()||'';
   DB.ventas[i].millajeVenta=parseFloat((document.getElementById('sv-millaje-venta')?.value||'0').replace(/,/g,''))||0;
+  // Vehículo recibido como parte de pago (corrección de monto/moneda)
+  if(document.getElementById('sv-tiene-recibido')?.checked){
+    const matEl=document.getElementById('sv-rec-mat-prev');
+    const prevRec=DB.ventas[i].vehiculoRecibido||{};
+    DB.ventas[i].vehiculoRecibido={
+      vehiculo:document.getElementById('sv-rec-vehiculo')?.value||'',
+      vin:document.getElementById('sv-rec-vin')?.value||'',
+      km:parseFloat((document.getElementById('sv-rec-km')?.value||'0').replace(/,/g,''))||0,
+      monto:parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,''))||0,
+      monedaRec:document.getElementById('sv-rec-moneda')?.value||'RD$',
+      matricula:matEl?.style.display!=='none'&&matEl?.src?matEl.src:(prevRec.matricula||'')
+    };
+    // Sincronizar el costo del vehículo ya registrado en Inventario (creado al momento de la venta)
+    const recActual=DB.ventas[i].vehiculoRecibido;
+    const costoRD=recActual.monedaRec==='USD'?recActual.monto*parseFloat(DB.config.tasaCambio||60):recActual.monto;
+    const vehRecIdx=DB.vehiculos.findIndex(x=>x.origenVenta===DB.ventas[i].factura);
+    if(vehRecIdx>=0){
+      DB.vehiculos[vehRecIdx].costo=costoRD;
+      if(recActual.vin)DB.vehiculos[vehRecIdx].vin=recActual.vin;
+      if(recActual.km)DB.vehiculos[vehRecIdx].millas=recActual.km;
+      DB.vehiculos[vehRecIdx].notas=`Recibido como parte de pago. Venta: ${DB.ventas[i].factura} — Cliente: ${cliNombre}. Valor recibido: ${recActual.monedaRec==='USD'?'$'+recActual.monto.toLocaleString('en-US',{minimumFractionDigits:2})+' USD':'RD$'+recActual.monto.toLocaleString('es-DO',{minimumFractionDigits:2})}`;
+      sDB('vehiculos');
+      toast('✅ Costo del vehículo recibido actualizado en Inventario','success');
+    }
+  } else if(document.getElementById('sv-tiene-recibido')){
+    DB.ventas[i].vehiculoRecibido=null;
+  }
   // Si cambió el vehículo: revertir el anterior y aplicar status al nuevo
   if(oldVehId!==vid2){
     const oldVi=DB.vehiculos.findIndex(x=>x.id===oldVehId);
@@ -8806,45 +8879,45 @@ function imprimirFactura(vid){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Factura ${escHtml(v.factura||'')} — ${escHtml(v.cliente||'')} — ${escHtml(v.codigo||'')} ${escHtml(v.vehiculo||'')}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#0f172a;background:#fff}
-    .page{max-width:680px;margin:0 auto;padding:20px}
-    .hdr{text-align:center;border-bottom:3px solid #0c447c;padding-bottom:12px;margin-bottom:16px}
-    .hdr-logo{width:100%;max-height:90px;object-fit:contain;display:block;margin:0 auto}
-    .hdr-logo-placeholder{font-size:30px;font-weight:700;color:#0c447c;letter-spacing:1px}
-    .hdr-empresa-sub{font-size:11px;color:#475569;margin-top:8px;line-height:1.6}
-    .hdr-doc-row{display:flex;justify-content:flex-end;margin-bottom:16px}
-    .hdr-doc-titulo{font-size:17px;font-weight:700;color:#0c447c;text-align:right}
-    .hdr-doc-fecha{font-size:12px;color:#475569;margin-top:3px;text-align:right}
-    .sec{margin-bottom:16px}
-    .sec-titulo{font-size:14px;font-weight:700;color:#0c447c;border-bottom:1.5px solid #0c447c;padding-bottom:4px;margin-bottom:8px}
-    .cli-line{font-size:13px;line-height:2}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#0f172a;background:#fff}
+    .page{max-width:680px;margin:0 auto;padding:16px}
+    .hdr{text-align:center;border-bottom:3px solid #0c447c;padding-bottom:8px;margin-bottom:10px}
+    .hdr-logo{width:100%;max-height:70px;object-fit:contain;display:block;margin:0 auto}
+    .hdr-logo-placeholder{font-size:26px;font-weight:700;color:#0c447c;letter-spacing:1px}
+    .hdr-empresa-sub{font-size:10px;color:#475569;margin-top:5px;line-height:1.4}
+    .hdr-doc-row{display:flex;justify-content:flex-end;margin-bottom:10px}
+    .hdr-doc-titulo{font-size:15px;font-weight:700;color:#0c447c;text-align:right}
+    .hdr-doc-fecha{font-size:11px;color:#475569;margin-top:2px;text-align:right}
+    .sec{margin-bottom:10px}
+    .sec-titulo{font-size:13px;font-weight:700;color:#0c447c;border-bottom:1.5px solid #0c447c;padding-bottom:3px;margin-bottom:6px}
+    .cli-line{font-size:12px;line-height:1.6}
     .cli-line b{font-weight:700;color:#0c447c}
-    .veh-tabla{width:100%;border-collapse:collapse;font-size:12px}
-    .veh-tabla td{padding:6px 8px;border:0.5px solid #e2e8f0}
+    .veh-tabla{width:100%;border-collapse:collapse;font-size:11px}
+    .veh-tabla td{padding:4px 8px;border:0.5px solid #e2e8f0}
     .veh-th{background:#dceefc;color:#0c447c;font-weight:700}
-    .veh-mono{font-family:monospace;font-size:11px}
-    .rec-box{background:#f0fdf4;border:1.5px solid #16a34a;border-radius:6px;padding:8px 10px;margin-top:6px}
-    .rec-titulo{font-size:10px;font-weight:800;text-transform:uppercase;color:#16a34a;margin-bottom:6px}
+    .veh-mono{font-family:monospace;font-size:10px}
+    .rec-box{background:#fff;border:1.5px solid #cbd5e1;border-radius:14px;padding:8px 12px;margin-top:4px}
+    .rec-titulo{font-size:10px;font-weight:800;text-transform:uppercase;color:#0c447c;margin-bottom:4px}
     .rec-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px}
-    .campo label{font-size:9px;font-weight:700;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:2px}
-    .campo span{font-size:11px;font-weight:600;color:#0f172a;display:block;padding:4px 8px;background:#f8fafc;border-radius:3px;border-left:2px solid #0c447c}
-    .campo span.mono{font-family:monospace;font-size:10px}
-    .obs-text{font-size:12px;color:#475569}
-    .fin-wrap{display:flex;justify-content:flex-end;margin-bottom:20px}
-    .fin-tabla{width:240px;border-collapse:collapse;font-size:13px}
-    .fin-tabla td{padding:5px 4px}
+    .campo label{font-size:9px;font-weight:700;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:1px}
+    .campo span{font-size:10px;font-weight:600;color:#0f172a;display:block;padding:3px 7px;background:#f8fafc;border-radius:3px;border-left:2px solid #0c447c}
+    .campo span.mono{font-family:monospace;font-size:9px}
+    .obs-text{font-size:11px;color:#475569}
+    .fin-wrap{display:flex;justify-content:flex-end;margin-bottom:12px}
+    .fin-tabla{width:230px;border-collapse:collapse;font-size:12px}
+    .fin-tabla td{padding:3px 4px}
     .fin-tabla .lbl{color:#475569}
     .fin-tabla .val{text-align:right}
     .fin-pend td{color:#a32d2d;font-weight:700}
     .fin-total{border-top:1.5px solid #0c447c}
-    .fin-total td{padding-top:7px;font-weight:700;color:#0c447c}
-    .garantia-box{font-size:10px;color:#94a3b8;border-top:0.5px solid #e2e8f0;padding-top:8px;margin-top:16px}
-    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:46px}
-    .firma-item{text-align:center;font-size:12px}
-    .firma-linea{border-top:1px solid #0f172a;padding-top:6px}
+    .fin-total td{padding-top:5px;font-weight:700;color:#0c447c}
+    .garantia-box{font-size:9px;color:#94a3b8;border-top:0.5px solid #e2e8f0;padding-top:6px;margin-top:10px}
+    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:26px}
+    .firma-item{text-align:center;font-size:11px}
+    .firma-linea{border-top:1px solid #0f172a;padding-top:5px}
     .firma-sub{color:#475569}
     .pie{display:none}
-    @media print{.np{display:none}body{padding:0}.page{padding:14px}@page{size:letter portrait;margin:8mm}}
+    @media print{.np{display:none}body{padding:0}.page{padding:10px}@page{size:letter portrait;margin:7mm}}
   </style></head><body><div class="page">
 
   <div class="hdr">
@@ -8902,7 +8975,7 @@ function imprimirFactura(vid){
         <div class="campo"><label>Marca / Modelo</label><span>${escHtml(rec.vehiculo)}</span></div>
         <div class="campo"><label>Chasis / VIN</label><span class="mono">${escHtml(rec.vin||'—')}</span></div>
         <div class="campo"><label>Kilometraje</label><span>${rec.km?Number(rec.km).toLocaleString()+' km':'—'}</span></div>
-        <div class="campo"><label>Valor recibido</label><span style="color:#16a34a;font-weight:700">${rec.monedaRec==="USD"?"$"+parseFloat(rec.monto||0).toLocaleString("en-US",{minimumFractionDigits:2})+" USD":fmt(rec.monto||0)}</span></div>
+        <div class="campo"><label>Valor recibido</label><span style="color:#0c447c;font-weight:700">${rec.monedaRec==="USD"?"$"+parseFloat(rec.monto||0).toLocaleString("en-US",{minimumFractionDigits:2})+" USD":fmt(rec.monto||0)}</span></div>
         <div class="campo"><label>Placa</label><span class="mono">${escHtml(rec.placa||"EN TRÁMITE")}</span></div>
       </div>
     </div>
@@ -8924,14 +8997,14 @@ function imprimirFactura(vid){
 
   <div class="firmas">
     <div class="firma-item">
-      <div style="height:50px"></div>
+      <div style="height:30px"></div>
       <div class="firma-linea">
         ${escHtml(firmaAut)}
         <div class="firma-sub">Vendedor</div>
       </div>
     </div>
     <div class="firma-item">
-      <div style="height:50px"></div>
+      <div style="height:30px"></div>
       <div class="firma-linea">
         ${escHtml(cli?.nombre||v.cliente||'Cliente')}
         <div class="firma-sub">Comprador</div>

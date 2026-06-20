@@ -7716,12 +7716,14 @@ function confirmarVenta(nf){
   const cliNombre=cli?.nombre||'Cliente';
   const v=DB.vehiculos.find(x=>x.id===vid);
   const inicial=parseFloat((document.getElementById('sv-inicial').value||'0').replace(/,/g,''));
-  const montoRecibido=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
-  const pendiente=Math.max(0,precio-inicial-montoRecibido);
-  const banco=document.getElementById('sv-banco')?.value||'';
-  const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(DB.config.tasaCambio||60);
+  const montoRecibido=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
+  const monedaRecibido=document.getElementById('sv-rec-moneda')?.value||'RD$';
+  const montoRecibidoConv=monedaRecibido===monedaVenta?montoRecibido:(monedaRecibido==='USD'?montoRecibido*tasa:montoRecibido/tasa);
+  const pendiente=Math.max(0,precio-inicial-montoRecibidoConv);
+  const banco=document.getElementById('sv-banco')?.value||'';
+  const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const totalGastos=(DB.gastosVehiculos||[]).filter(g=>g.vehiculoId===vid).reduce((a,g)=>a+parseFloat(g.montoFactura||0),0);
   // Estado automático según pendiente
   // Estado automático: VENDIDO si pago completo, si no TRÁNSITO
@@ -8243,12 +8245,14 @@ function llenarInfoVenta(vid){
 function calcPend(){
   const p=parseMoney(document.getElementById('sv-precio')?.value);
   const i=parseMoney(document.getElementById('sv-inicial')?.value);
-  const rec=parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,''));
-  const pd=document.getElementById('sv-pendiente');
-  if(pd)pd.value=fmtMoneyDisplay(Math.max(0,p-i-rec));
-  // Mostrar equivalente si es USD
+  const rec=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
+  const recMoneda=document.getElementById('sv-rec-moneda')?.value||'RD$';
   const moneda=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
+  const recConv=recMoneda===moneda?rec:(recMoneda==='USD'?rec*tasa:rec/tasa);
+  const pd=document.getElementById('sv-pendiente');
+  if(pd)pd.value=fmtMoneyDisplay(Math.max(0,p-i-recConv));
+  // Mostrar equivalente si es USD
   const wrap=document.getElementById('sv-equiv-wrap');
   const equiv=document.getElementById('sv-equiv');
   if(wrap&&equiv){
@@ -8272,12 +8276,15 @@ function confirmarVenta(nf){
   const cliNombre=cli?.nombre||'Cliente';
   const v=DB.vehiculos.find(x=>x.id===vid);
   const inicial=parseMoney(document.getElementById('sv-inicial').value);
-  const montoRecibido=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
-  const pendiente=Math.max(0,precio-inicial-montoRecibido);
-  const banco=document.getElementById('sv-banco')?.value||'';
-  const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(DB.config.tasaCambio||60);
+  const montoRecibido=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
+  const monedaRecibido=document.getElementById('sv-rec-moneda')?.value||'RD$';
+  // Convertir el monto recibido a la moneda de la venta antes de restarlo
+  const montoRecibidoConv=monedaRecibido===monedaVenta?montoRecibido:(monedaRecibido==='USD'?montoRecibido*tasa:montoRecibido/tasa);
+  const pendiente=Math.max(0,precio-inicial-montoRecibidoConv);
+  const banco=document.getElementById('sv-banco')?.value||'';
+  const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const totalGastos=(DB.gastosVehiculos||[]).filter(g=>g.vehiculoId===vid).reduce((a,g)=>a+parseFloat(g.montoFactura||0),0);
   // Estado automático según pendiente
   const estadoAuto='TRÁNSITO'; // Siempre TRÁNSITO hasta que se registre la entrega
@@ -8704,11 +8711,14 @@ function guardarEditarVenta(vid){
   const nuevoVeh=DB.vehiculos.find(x=>x.id===vid2);
   if(!nuevoVeh){toast('Vehículo no encontrado','error');return;}
   const inicial=parseMoney(document.getElementById('sv-inicial').value);
-  const pendiente=Math.max(0,precio-inicial);
-  const banco=document.getElementById('sv-banco')?.value||'';
-  const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
+  const montoRecibidoEdit=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
+  const monedaRecibidoEdit=document.getElementById('sv-rec-moneda')?.value||'RD$';
+  const montoRecibidoEditConv=monedaRecibidoEdit===monedaVenta?montoRecibidoEdit:(monedaRecibidoEdit==='USD'?montoRecibidoEdit*tasa:montoRecibidoEdit/tasa);
+  const pendiente=Math.max(0,precio-inicial-montoRecibidoEditConv);
+  const banco=document.getElementById('sv-banco')?.value||'';
+  const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const totalGastos=(DB.gastosVehiculos||[]).filter(g=>g.vehiculoId===vid2).reduce((a,g)=>a+parseFloat(g.montoFactura||0),0);
   const estadoVenta=document.getElementById('ev-estado')?.value||'TRÁNSITO';
   const oldVehId=DB.ventas[i].vehiculoId;
@@ -8892,10 +8902,10 @@ function imprimirFactura(vid){
     .sec-titulo{font-size:13px;font-weight:700;color:#0c447c;border-bottom:1.5px solid #0c447c;padding-bottom:3px;margin-bottom:6px}
     .cli-line{font-size:12px;line-height:1.6}
     .cli-line b{font-weight:700;color:#0c447c}
-    .veh-tabla{width:100%;border-collapse:collapse;font-size:11px}
-    .veh-tabla td{padding:4px 8px;border:0.5px solid #e2e8f0}
+    .veh-tabla{width:100%;border-collapse:collapse;font-size:12.5px}
+    .veh-tabla td{padding:5px 8px;border:0.5px solid #e2e8f0;font-weight:700;color:#0f172a}
     .veh-th{background:#dceefc;color:#0c447c;font-weight:700}
-    .veh-mono{font-family:monospace;font-size:10px}
+    .veh-mono{font-family:monospace;font-size:11px}
     .rec-box{background:#fff;border:1.5px solid #cbd5e1;border-radius:14px;padding:8px 12px;margin-top:4px}
     .rec-titulo{font-size:10px;font-weight:800;text-transform:uppercase;color:#0c447c;margin-bottom:4px}
     .rec-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px}
@@ -8908,9 +8918,10 @@ function imprimirFactura(vid){
     .fin-tabla td{padding:3px 4px}
     .fin-tabla .lbl{color:#475569}
     .fin-tabla .val{text-align:right}
-    .fin-pend td{color:#a32d2d;font-weight:700}
-    .fin-total{border-top:1.5px solid #0c447c}
-    .fin-total td{padding-top:5px;font-weight:700;color:#0c447c}
+    .fin-total-top{border-bottom:1.5px solid #0c447c}
+    .fin-total-top td{padding-bottom:5px;font-weight:700;color:#0c447c}
+    .fin-pend{border-top:1.5px solid #a32d2d}
+    .fin-pend td{padding-top:5px;color:#a32d2d;font-weight:700}
     .garantia-box{font-size:9px;color:#94a3b8;border-top:0.5px solid #e2e8f0;padding-top:6px;margin-top:10px}
     .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:26px}
     .firma-item{text-align:center;font-size:11px}
@@ -8988,10 +8999,10 @@ function imprimirFactura(vid){
 
   <div class="fin-wrap">
     <table class="fin-tabla">
-      <tr><td class="lbl">Inicial</td><td class="val">${fV(v.inicial||0)}</td></tr>
-      ${rec?.vehiculo?`<tr><td class="lbl">Vehículo recibido</td><td class="val">${rec.monedaRec==="USD"?"$"+parseFloat(rec.monto||0).toLocaleString("en-US",{minimumFractionDigits:2})+" USD":fmt(rec.monto||0)}</td></tr>`:''}
+      <tr class="fin-total-top"><td>Total general</td><td class="val">${fV(v.precioVenta)}</td></tr>
+      <tr><td class="lbl">Inicial</td><td class="val">− ${fV(v.inicial||0)}</td></tr>
+      ${rec?.vehiculo?`<tr><td class="lbl">Vehículo recibido</td><td class="val">− ${rec.monedaRec==="USD"?"$"+parseFloat(rec.monto||0).toLocaleString("en-US",{minimumFractionDigits:2})+" USD":fmt(rec.monto||0)}</td></tr>`:''}
       <tr class="fin-pend"><td>Por pagar</td><td class="val">${fV(v.pendiente||0)}</td></tr>
-      <tr class="fin-total"><td>Total general</td><td class="val">${fV(v.precioVenta)}</td></tr>
     </table>
   </div>
 

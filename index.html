@@ -8895,8 +8895,9 @@ function imprimirFactura(vid){
     .hdr-logo{width:100%;max-height:70px;object-fit:contain;display:block;margin:0 auto}
     .hdr-logo-placeholder{font-size:26px;font-weight:700;color:#0c447c;letter-spacing:1px}
     .hdr-empresa-sub{font-size:10px;color:#475569;margin-top:5px;line-height:1.4}
-    .hdr-doc-row{display:flex;justify-content:flex-end;margin-bottom:10px}
-    .hdr-doc-titulo{font-size:15px;font-weight:700;color:#0c447c;text-align:right}
+    .hdr-doc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .hdr-doc-titulo{font-size:38px;font-weight:700;color:#0c447c;text-align:left;margin-left:8%}
+    .hdr-doc-nro{font-size:12px;font-weight:700;color:#0c447c;text-align:right}
     .hdr-doc-fecha{font-size:11px;color:#475569;margin-top:2px;text-align:right}
     .sec{margin-bottom:10px}
     .sec-titulo{font-size:13px;font-weight:700;color:#0c447c;border-bottom:1.5px solid #0c447c;padding-bottom:3px;margin-bottom:6px}
@@ -8940,8 +8941,9 @@ function imprimirFactura(vid){
   </div>
 
   <div class="hdr-doc-row">
-    <div>
-      <div class="hdr-doc-titulo">Factura de venta &nbsp;·&nbsp; N.º ${escHtml(v.factura||'')}</div>
+    <div class="hdr-doc-titulo">Factura de venta</div>
+    <div style="text-align:right">
+      <div class="hdr-doc-nro">N.º ${escHtml(v.factura||'')}</div>
       <div class="hdr-doc-fecha">${fechaLarga}</div>
     </div>
   </div>

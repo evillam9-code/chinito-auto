@@ -8704,7 +8704,7 @@ function editarVenta(vid){
         <div class="form-row c3" style="margin-bottom:8px">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Marca / Modelo</label><input type="text" id="sv-rec-vehiculo" value="${escHtml(rec.vehiculo||'')}" placeholder="Ej: Toyota Corolla 2018"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" value="${escHtml(rec.vin||'')}" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" value="${(rec.placa||'')" placeholder="A-123456" maxlength="9" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase()"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" value="${rec.placa||''}" placeholder="A-123456" maxlength="9" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase()"></div>
         </div>
         <div class="form-row c2" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>

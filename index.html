@@ -8890,48 +8890,54 @@ function imprimirFactura(vid){
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Outfit',Arial,sans-serif;font-size:12.5px;color:#0f172a;background:#fff}
-    .page{max-width:680px;margin:0 auto;padding:28px 32px 32px}
-    .hdr{text-align:center;border-bottom:3px solid #083a70;padding-bottom:12px;margin-bottom:14px}
-    .hdr-logo{max-width:200px;max-height:72px;object-fit:contain;display:block;margin:0 auto 6px}
-    .hdr-empresa-sub{font-size:10.5px;color:#4a5568;line-height:1.6;text-align:center;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
-    .hdr-doc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #d1dbe8}
-    .hdr-doc-titulo{flex:1;font-size:22px;font-weight:900;color:#083a70;text-align:center;letter-spacing:1px;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
-    .hdr-doc-nro{font-size:12px;font-weight:700;color:#083a70;text-align:right;font-family:'Outfit',Arial,sans-serif}
-    .hdr-doc-fecha{font-size:11px;color:#64748b;margin-top:2px;text-align:right;font-family:'Outfit',Arial,sans-serif}
-    .sec{margin-bottom:13px}
-    .sec-titulo{font-size:12px;font-weight:800;color:#fff;background:#083a70;padding:4px 10px;border-radius:3px;margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px;font-family:'Outfit',Arial,sans-serif}
-    .cli-line{font-size:12.5px;line-height:1.85;font-family:'Outfit',Arial,sans-serif}
+    body{font-family:'Outfit',Arial,sans-serif;font-size:11px;color:#0f172a;background:#fff}
+    .page{max-width:680px;margin:0 auto;padding:16px 22px 14px}
+    .hdr{text-align:center;border-bottom:3px solid #083a70;padding-bottom:8px;margin-bottom:8px}
+    .hdr-logo{max-width:170px;max-height:58px;object-fit:contain;display:block;margin:0 auto 4px}
+    .hdr-empresa-sub{font-size:9px;color:#4a5568;line-height:1.5;text-align:center;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
+    .hdr-doc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #d1dbe8}
+    .hdr-doc-titulo{flex:1;font-size:19px;font-weight:900;color:#083a70;text-align:center;letter-spacing:1px;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
+    .hdr-doc-nro{font-size:11px;font-weight:700;color:#083a70;text-align:right;font-family:'Outfit',Arial,sans-serif}
+    .hdr-doc-fecha{font-size:10px;color:#64748b;margin-top:1px;text-align:right;font-family:'Outfit',Arial,sans-serif}
+    .sec{margin-bottom:7px}
+    .sec-titulo{font-size:10.5px;font-weight:800;color:#fff;background:#083a70;padding:3px 9px;border-radius:3px;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;font-family:'Outfit',Arial,sans-serif}
+    .cli-line{font-size:11px;line-height:1.6;font-family:'Outfit',Arial,sans-serif}
     .cli-line b{font-weight:700;color:#083a70}
     .cli-line span{text-transform:uppercase;font-weight:500}
-    .veh-tabla{width:100%;border-collapse:collapse;font-size:12.5px;font-family:'Outfit',Arial,sans-serif}
-    .veh-tabla td{padding:6px 9px;border:0.5px solid #cdd8e8;font-weight:600;color:#0f172a;text-transform:uppercase;font-size:12.5px;font-family:'Outfit',Arial,sans-serif}
-    .veh-th{background:#daeaf8;color:#083a70;font-weight:800;font-size:12.5px;text-transform:uppercase}
-    .placa-val{font-size:13.5px;font-weight:800;color:#083a70;letter-spacing:1px}
-    .rec-box{background:#f8fbff;border:1.5px solid #b8d0e8;border-radius:8px;padding:10px 14px;margin-top:2px}
-    .rec-titulo{font-size:11px;font-weight:900;text-transform:uppercase;color:#083a70;margin-bottom:8px;letter-spacing:.5px;font-family:'Outfit',Arial,sans-serif}
-    .rec-grid{display:grid;grid-template-columns:2fr 2fr 1fr;gap:8px}
-    .campo label{font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:2px;letter-spacing:.4px;font-family:'Outfit',Arial,sans-serif}
-    .campo span{font-size:12.5px;font-weight:700;color:#0f172a;display:block;padding:4px 8px;background:#fff;border-radius:3px;border-left:2.5px solid #083a70;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
-    .campo span.placa-badge{font-size:13.5px;font-weight:800;color:#083a70;letter-spacing:1px}
-    .obs-text{font-size:12px;color:#374151;text-transform:uppercase;font-weight:500;font-family:'Outfit',Arial,sans-serif}
-    .fin-wrap{display:flex;justify-content:flex-end;margin-bottom:22px}
-    .fin-tabla{width:260px;border-collapse:collapse;font-size:12.5px;font-family:'Outfit',Arial,sans-serif}
-    .fin-tabla td{padding:5px 6px;font-family:'Outfit',Arial,sans-serif}
+    .veh-tabla{width:100%;border-collapse:collapse;font-size:11px;font-family:'Outfit',Arial,sans-serif}
+    .veh-tabla td{padding:4px 7px;border:0.5px solid #cdd8e8;font-weight:600;color:#0f172a;text-transform:uppercase;font-size:11px;font-family:'Outfit',Arial,sans-serif}
+    .veh-th{background:#daeaf8;color:#083a70;font-weight:800;font-size:11px;text-transform:uppercase}
+    .placa-val{font-size:12px;font-weight:800;color:#083a70;letter-spacing:1px}
+    .rec-box{background:#f8fbff;border:1.5px solid #b8d0e8;border-radius:6px;padding:6px 10px;margin-top:2px}
+    .rec-titulo{font-size:9.5px;font-weight:900;text-transform:uppercase;color:#083a70;margin-bottom:5px;letter-spacing:.5px;font-family:'Outfit',Arial,sans-serif}
+    .rec-grid{display:grid;grid-template-columns:2fr 2fr 1fr;gap:5px}
+    .campo label{font-size:8.5px;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:1px;letter-spacing:.4px;font-family:'Outfit',Arial,sans-serif}
+    .campo span{font-size:11px;font-weight:700;color:#0f172a;display:block;padding:3px 7px;background:#fff;border-radius:3px;border-left:2px solid #083a70;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
+    .campo span.placa-badge{font-size:12px;font-weight:800;color:#083a70;letter-spacing:1px}
+    .obs-text{font-size:9.5px;color:#374151;text-transform:uppercase;font-weight:500;font-family:'Outfit',Arial,sans-serif;line-height:1.4}
+    .fin-wrap{display:flex;justify-content:flex-end;margin-bottom:10px}
+    .fin-tabla{width:245px;border-collapse:collapse;font-size:11px;font-family:'Outfit',Arial,sans-serif}
+    .fin-tabla td{padding:3px 5px;font-family:'Outfit',Arial,sans-serif}
     .fin-tabla .lbl{color:#4b5563;font-weight:500}
     .fin-tabla .val{text-align:right;font-weight:700}
     .fin-costo{border-bottom:1.5px solid #083a70}
-    .fin-costo td{padding-bottom:7px;font-weight:700;color:#083a70;font-size:12.5px}
+    .fin-costo td{padding-bottom:5px;font-weight:700;color:#083a70;font-size:11px}
     .fin-pend{border-top:2px solid #a32d2d}
-    .fin-pend td{padding-top:7px;color:#a32d2d;font-weight:800;font-size:14px}
-    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:28px;margin-bottom:24px}
+    .fin-pend td{padding-top:5px;color:#a32d2d;font-weight:800;font-size:12.5px}
+    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:14px;margin-bottom:12px}
     .firma-item{text-align:center}
-    .firma-espacio{height:36px}
-    .firma-linea{border-top:1.5px solid #0f172a;padding-top:6px;font-family:'Outfit',Arial,sans-serif}
-    .firma-sub{color:#083a70;font-size:11px;margin-top:2px;text-transform:uppercase;font-weight:700;letter-spacing:.5px}
-    .gracias-box{border-top:2px solid #083a70;padding-top:14px;text-align:center}
-    .gracias-text{font-size:15px;font-weight:800;color:#083a70;text-transform:uppercase;letter-spacing:2px;font-family:'Outfit',Arial,sans-serif}
-    @media print{.np{display:none}body{padding:0}.page{padding:10px}@page{size:letter portrait;margin:7mm}}
+    .firma-espacio{height:26px}
+    .firma-linea{border-top:1.5px solid #0f172a;padding-top:4px;font-family:'Outfit',Arial,sans-serif}
+    .firma-sub{color:#083a70;font-size:10px;margin-top:1px;text-transform:uppercase;font-weight:700;letter-spacing:.5px}
+    .gracias-box{border-top:2px solid #083a70;padding-top:8px;text-align:center}
+    .gracias-text{font-size:12px;font-weight:800;color:#083a70;text-transform:uppercase;letter-spacing:2px;font-family:'Outfit',Arial,sans-serif}
+    @media print{
+      .np{display:none}
+      html,body{height:100%}
+      body{padding:0}
+      .page{padding:6px 12px}
+      @page{size:letter portrait;margin:5mm}
+    }
   </style></head><body><div class="page">
 
   <div class="hdr">

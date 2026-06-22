@@ -4981,31 +4981,98 @@ function renderAlertas(){
   const danger=alertas.filter(a=>a.nivel==='danger');
   const warning=alertas.filter(a=>a.nivel==='warning');
 
+  // Guardar alertas globalmente para filtrado
+  window._todasAlertas=alertas;
+  const tiposUnicos=[...new Set(alertas.map(a=>a.tipo))];
+  const modulosUnicos=[...new Set(alertas.map(a=>a.modulo))];
+  const labelTipo={SIN_VIN:'Sin Chasis/VIN',SIN_COSTO:'Sin Costos',CXP:'CxP Pendiente',CXC_VENCIDA:'CxC Vencida',CXC:'CxC Pendiente',SIN_VENDER_6M:'6 Meses sin Vender',SIN_VENDER_1A:'1 Año sin Vender',DOCS:'Documentos',PLACA_60DIAS:'Placa +60 días',PLACA_EXH_VENCIDA:'Placa Exhibición Vencida',PLACA_EXH_PROX:'Placa Exhibición Próxima',SEGURO_VENCIDO:'Seguro Vencido',SEGURO_PROX:'Seguro Próximo'};
+  const labelMod={inventario:'Inventario',gastosVeh:'Gastos Veh.',cxp:'CxP',cxc:'CxC',ventas:'Ventas',seguros:'Seguros'};
   document.getElementById('page-alertas').innerHTML=`
     <div class="page-header">
-      <div><h1>🔔 Alertas del Sistema</h1><p>${danger.length} críticas — ${warning.length} advertencias</p></div>
+      <div><h1>🔔 Alertas del Sistema</h1><p>${danger.length} críticas &mdash; ${warning.length} advertencias &mdash; ${alertas.length} total</p></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-secondary btn-sm" onclick="alertasSeleccionadas=new Set(document.querySelectorAll('.alerta-check').forEach(c=>{c.checked=true;alertasSeleccionadas.add(c.value);})||alertasSeleccionadas);renderAlertas()">☑️ Seleccionar Todas</button>
         <button class="btn btn-secondary btn-sm" onclick="exportarAlertasPDF()">📄 Exportar PDF</button>
+        <button class="btn btn-secondary btn-sm" onclick="imprimirAlertasFiltradas()">🖨️ Imprimir</button>
         <button class="btn btn-secondary btn-sm" onclick="renderAlertas()">🔄 Actualizar</button>
       </div>
     </div>
-    ${alertas.length===0?`<div class="card" style="text-align:center;padding:48px"><div style="font-size:48px;margin-bottom:12px">✅</div><div style="font-size:18px;font-weight:700;color:var(--green)">Sin alertas activas</div><p style="color:var(--gray);margin-top:8px">El sistema está en orden</p></div>`:`
-    <div class="card">
-      ${danger.length?`<div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--red2)">🔴 Críticas (${danger.length})</div>
-      ${danger.map(a=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;margin-bottom:6px;background:var(--red2);border-radius:8px;border-left:4px solid var(--red)">
-        <input type="checkbox" class="alerta-check" value="${a.id}" ${alertasSeleccionadas.has(a.id)?'checked':''} onchange="if(this.checked)alertasSeleccionadas.add(this.value);else alertasSeleccionadas.delete(this.value)" style="width:16px;height:16px;margin-top:2px;flex-shrink:0">
-        <div style="flex:1"><div style="font-weight:700;font-size:13px;color:var(--red)">${escHtml(a.titulo)}</div><div style="font-size:12px;color:var(--navy);margin-top:2px">${escHtml(a.msg)}</div></div>
-        <button class="btn btn-sm" style="background:var(--red);color:#fff;flex-shrink:0" onclick="showPage('${a.modulo}')">Ver →</button>
-      </div>`).join('')}`:''}
-      ${warning.length?`<div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--amber2);margin-top:${danger.length?'16px':'0'}">🟡 Advertencias (${warning.length})</div>
-      ${warning.map(a=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;margin-bottom:6px;background:var(--amber2);border-radius:8px;border-left:4px solid var(--amber)">
-        <input type="checkbox" class="alerta-check" value="${a.id}" ${alertasSeleccionadas.has(a.id)?'checked':''} onchange="if(this.checked)alertasSeleccionadas.add(this.value);else alertasSeleccionadas.delete(this.value)" style="width:16px;height:16px;margin-top:2px;flex-shrink:0">
-        <div style="flex:1"><div style="font-weight:700;font-size:13px;color:var(--amber)">${escHtml(a.titulo)}</div><div style="font-size:12px;color:var(--navy);margin-top:2px">${escHtml(a.msg)}</div></div>
-        <button class="btn btn-sm" style="background:var(--amber);color:#fff;flex-shrink:0" onclick="showPage('${a.modulo}')">Ver →</button>
-      </div>`).join('')}`:''}
-    </div>`}`;
+    <div class="card" style="margin-bottom:14px;padding:14px 20px">
+      <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);margin-bottom:5px">Tipo</div>
+          <select id="filtro-alerta-tipo" onchange="filtrarAlertas()" style="padding:7px 12px;border:1.5px solid var(--gray3);border-radius:6px;font-size:12px;font-family:inherit;min-width:180px">
+            <option value="">Todos los tipos</option>
+            ${tiposUnicos.map(t=>`<option value="${t}">${labelTipo[t]||t}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);margin-bottom:5px">Módulo</div>
+          <select id="filtro-alerta-modulo" onchange="filtrarAlertas()" style="padding:7px 12px;border:1.5px solid var(--gray3);border-radius:6px;font-size:12px;font-family:inherit;min-width:160px">
+            <option value="">Todos los módulos</option>
+            ${modulosUnicos.map(m=>`<option value="${m}">${labelMod[m]||m}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--gray);margin-bottom:5px">Nivel</div>
+          <select id="filtro-alerta-nivel" onchange="filtrarAlertas()" style="padding:7px 12px;border:1.5px solid var(--gray3);border-radius:6px;font-size:12px;font-family:inherit;min-width:140px">
+            <option value="">Todos</option>
+            <option value="danger">🔴 Críticas</option>
+            <option value="warning">🟡 Advertencias</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('filtro-alerta-tipo').value='';document.getElementById('filtro-alerta-modulo').value='';document.getElementById('filtro-alerta-nivel').value='';filtrarAlertas()">✖ Limpiar</button>
+      </div>
+    </div>
+    <div id="alertas-lista-wrap">${_renderAlertasLista(alertas)}</div>`;
 }
+function _renderAlertasLista(lista){
+  if(!lista||lista.length===0)return`<div class="card" style="text-align:center;padding:48px"><div style="font-size:48px;margin-bottom:12px">✅</div><div style="font-size:18px;font-weight:700;color:var(--green)">Sin alertas</div><p style="color:var(--gray);margin-top:8px">El sistema está en orden con los filtros seleccionados</p></div>`;
+  const d=lista.filter(a=>a.nivel==='danger');
+  const w=lista.filter(a=>a.nivel==='warning');
+  return`<div class="card">
+    ${d.length?`<div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--red2)">🔴 Críticas (${d.length})</div>
+    ${d.map(a=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;margin-bottom:6px;background:var(--red2);border-radius:8px;border-left:4px solid var(--red)">
+      <div style="flex:1"><div style="font-weight:700;font-size:13px;color:var(--red)">${escHtml(a.titulo)}</div><div style="font-size:12px;color:var(--navy);margin-top:2px">${escHtml(a.msg)}</div><div style="font-size:10px;color:var(--gray);margin-top:3px;text-transform:uppercase;letter-spacing:.3px">📂 ${a.modulo}</div></div>
+      <button class="btn btn-sm" style="background:var(--red);color:#fff;flex-shrink:0" onclick="showPage('${a.modulo}')">Ver →</button>
+    </div>`).join('')}`:''}
+    ${w.length?`<div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--amber2);margin-top:${d.length?'16px':'0'}">🟡 Advertencias (${w.length})</div>
+    ${w.map(a=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;margin-bottom:6px;background:var(--amber2);border-radius:8px;border-left:4px solid var(--amber)">
+      <div style="flex:1"><div style="font-weight:700;font-size:13px;color:var(--amber)">${escHtml(a.titulo)}</div><div style="font-size:12px;color:var(--navy);margin-top:2px">${escHtml(a.msg)}</div><div style="font-size:10px;color:var(--gray);margin-top:3px;text-transform:uppercase;letter-spacing:.3px">📂 ${a.modulo}</div></div>
+      <button class="btn btn-sm" style="background:var(--amber);color:#fff;flex-shrink:0" onclick="showPage('${a.modulo}')">Ver →</button>
+    </div>`).join('')}`:''}
+  </div>`;
+}
+function filtrarAlertas(){
+  const tipo=document.getElementById('filtro-alerta-tipo')?.value||'';
+  const modulo=document.getElementById('filtro-alerta-modulo')?.value||'';
+  const nivel=document.getElementById('filtro-alerta-nivel')?.value||'';
+  let lista=(window._todasAlertas||[]);
+  if(tipo)lista=lista.filter(a=>a.tipo===tipo);
+  if(modulo)lista=lista.filter(a=>a.modulo===modulo);
+  if(nivel)lista=lista.filter(a=>a.nivel===nivel);
+  const wrap=document.getElementById('alertas-lista-wrap');
+  if(wrap)wrap.innerHTML=_renderAlertasLista(lista);
+}
+function imprimirAlertasFiltradas(){
+  const tipo=document.getElementById('filtro-alerta-tipo')?.value||'';
+  const modulo=document.getElementById('filtro-alerta-modulo')?.value||'';
+  const nivel=document.getElementById('filtro-alerta-nivel')?.value||'';
+  let lista=(window._todasAlertas||[]);
+  if(tipo)lista=lista.filter(a=>a.tipo===tipo);
+  if(modulo)lista=lista.filter(a=>a.modulo===modulo);
+  if(nivel)lista=lista.filter(a=>a.nivel===nivel);
+  const hoy=today();
+  const win=window.open('','_blank','width=800,height=600');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Alertas</title><style>body{font-family:Arial,sans-serif;padding:24px;font-size:12px}h2{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#083a70;color:#fff;padding:8px;font-size:11px;text-align:left}td{padding:8px;border-bottom:1px solid #e2e8f0}.r{color:#dc2626;font-weight:700}.w{color:#d97706;font-weight:700}@media print{button{display:none}}</style></head><body>
+  ${DB.config.logoData?`<img src="${DB.config.logoData}" style="max-height:50px;margin-bottom:8px;display:block">`:''}
+  <h2>${escHtml(DB.config.empresa||'CHINITO AUTO IMPORT')} — REPORTE DE ALERTAS</h2>
+  <div style="color:#6b7280;font-size:11px;margin-bottom:16px">Fecha: ${fmtDate(hoy)} | Total: ${lista.length} alertas${tipo?' | Tipo: '+tipo:''}${modulo?' | Módulo: '+modulo:''}${nivel?' | Nivel: '+nivel:''}</div>
+  <table><thead><tr><th>Nivel</th><th>Módulo</th><th>Tipo / Alerta</th><th>Detalle</th></tr></thead><tbody>
+  ${lista.map(a=>`<tr><td class="${a.nivel==='danger'?'r':'w'}">${a.nivel==='danger'?'🔴 CRÍTICA':'🟡 ADVERTENCIA'}</td><td style="text-transform:uppercase;font-weight:600">${escHtml(a.modulo)}</td><td style="font-weight:700">${escHtml(a.titulo)}</td><td>${escHtml(a.msg)}</td></tr>`).join('')}
+  </tbody></table>
+  <div style="margin-top:20px;text-align:center"><button onclick="window.print()" style="padding:10px 24px;background:#083a70;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">🖨️ Imprimir / PDF</button></div>
+  </body></html>`);
+  win.document.close();
 function exportarAlertasPDF(){
   const hoy=today();const hoyDate=new Date();
   const alertas=[];
@@ -7362,16 +7429,9 @@ function nuevaVenta(){
         <div class="form-row c3" style="margin-bottom:8px">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Marca / Modelo</label><input type="text" id="sv-rec-vehiculo" placeholder="Ej: Toyota Corolla 2018"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Kilometraje</label><input type="text" id="sv-rec-km" placeholder="0" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" placeholder="A-123456" maxlength="9" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase()"></div>
         </div>
-        <div class="form-row c3" style="margin-bottom:0">
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Monto Recibido</label><input type="text" id="sv-rec-monto" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Moneda</label>
-            <select id="sv-rec-moneda">
-              <option value="RD$">RD$ — Pesos</option>
-              <option value="USD">USD — Dólares</option>
-            </select>
-          </div>
+        <div class="form-row c2" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
             <input type="file" id="sv-rec-matricula" accept=".jpg,.jpeg,.png" onchange="previewFoto('sv-rec-matricula','sv-rec-mat-prev')">
             <img id="sv-rec-mat-prev" style="display:none;width:100%;max-height:60px;object-fit:cover;border-radius:4px;margin-top:4px">
@@ -7687,9 +7747,8 @@ function llenarInfoVenta(vid){
 function calcPend(){
   const p=parseFloat((document.getElementById('sv-precio')?.value||'0').replace(/,/g,''));
   const i=parseFloat((document.getElementById('sv-inicial')?.value||'0').replace(/,/g,''));
-  const rec=parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,''));
   const pd=document.getElementById('sv-pendiente');
-  if(pd)pd.value=fmtMoneyDisplay(Math.max(0,p-i-rec));
+  if(pd)pd.value=fmtMoneyDisplay(Math.max(0,p-i));
   // Mostrar equivalente si es USD
   const moneda=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
@@ -7718,10 +7777,7 @@ function confirmarVenta(nf){
   const inicial=parseFloat((document.getElementById('sv-inicial').value||'0').replace(/,/g,''));
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(DB.config.tasaCambio||60);
-  const montoRecibido=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
-  const monedaRecibido=document.getElementById('sv-rec-moneda')?.value||'RD$';
-  const montoRecibidoConv=monedaRecibido===monedaVenta?montoRecibido:(monedaRecibido==='USD'?montoRecibido*tasa:montoRecibido/tasa);
-  const pendiente=Math.max(0,precio-inicial-montoRecibidoConv);
+  const pendiente=Math.max(0,precio-inicial);
   const banco=document.getElementById('sv-banco')?.value||'';
   const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const totalGastos=(DB.gastosVehiculos||[]).filter(g=>g.vehiculoId===vid).reduce((a,g)=>a+parseFloat(g.montoFactura||0),0);
@@ -7772,11 +7828,9 @@ function confirmarVenta(nf){
     const matEl=document.getElementById('sv-rec-mat-prev');
     const recVehNombre=document.getElementById('sv-rec-vehiculo')?.value||'';
     const recVin=document.getElementById('sv-rec-vin')?.value||'';
-    const recKm=parseFloat((document.getElementById('sv-rec-km')?.value||'0').replace(/,/g,''))||0;
-    const recMonto=parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,''));
-    const recMoneda=document.getElementById('sv-rec-moneda')?.value||'RD$';
+    const recPlaca=document.getElementById('sv-rec-placa')?.value||'EN TRÁMITE';
     const recMatricula=matEl?.style.display!=='none'&&matEl?.src?matEl.src:'';
-    venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,km:recKm,monto:recMonto,monedaRec:recMoneda,matricula:recMatricula};
+    venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,placa:recPlaca,matricula:recMatricula};
     // Registrar automáticamente como vehículo activo tipo RECIBIDO
     if(recVehNombre){
       // Parsear marca, modelo, año del texto libre
@@ -7798,13 +7852,13 @@ function confirmarVenta(nf){
           codigo:nuevoCodigo,
           marca,modelo,anio,
           vin:recVin,
-          millas:recKm,
+          placa:recPlaca,
           status:'ACTIVO',
           tipoCompra:'RECIBIDO',
-          suplidor:cliNombre, // El cliente que lo entregó
-          costo:recMoneda==='USD'?recMonto*parseFloat(DB.config.tasaCambio||60):recMonto,     // Costo en RD$ (convertido si se recibió en USD)
+          suplidor:cliNombre,
+          costo:0,
           fecha:venta.fecha,
-          notas:`Recibido como parte de pago. Venta: ${nf} — Cliente: ${cliNombre}. Valor recibido: ${recMoneda==='USD'?'$'+recMonto.toLocaleString('en-US',{minimumFractionDigits:2})+' USD':'RD$'+recMonto.toLocaleString('es-DO',{minimumFractionDigits:2})}`,
+          notas:`Recibido como parte de pago. Venta: ${nf} — Cliente: ${cliNombre}.`,
           propietario:DB.config.propietarios?.[0]||'',
           color:'',placa:'',carfax:'',foto:'',precioVenta:0,
           origenVenta:nf // referencia a la venta de origen
@@ -8058,16 +8112,9 @@ function nuevaVenta(){
         <div class="form-row c3" style="margin-bottom:8px">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Marca / Modelo</label><input type="text" id="sv-rec-vehiculo" placeholder="Ej: Toyota Corolla 2018"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Kilometraje</label><input type="text" id="sv-rec-km" placeholder="0" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" placeholder="A-123456" maxlength="9" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase()"></div>
         </div>
-        <div class="form-row c3" style="margin-bottom:0">
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Monto Recibido</label><input type="text" id="sv-rec-monto" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Moneda</label>
-            <select id="sv-rec-moneda">
-              <option value="RD$">RD$ — Pesos</option>
-              <option value="USD">USD — Dólares</option>
-            </select>
-          </div>
+        <div class="form-row c2" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
             <input type="file" id="sv-rec-matricula" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('sv-rec-matricula','sv-rec-mat-prev')">
             <img id="sv-rec-mat-prev" style="display:none;width:100%;max-height:60px;object-fit:cover;border-radius:4px;margin-top:4px">
@@ -8245,11 +8292,10 @@ function llenarInfoVenta(vid){
 function calcPend(){
   const p=parseMoney(document.getElementById('sv-precio')?.value);
   const i=parseMoney(document.getElementById('sv-inicial')?.value);
-  const rec=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
-  const recMoneda=document.getElementById('sv-rec-moneda')?.value||'RD$';
+
   const moneda=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
-  const recConv=recMoneda===moneda?rec:(recMoneda==='USD'?rec*tasa:rec/tasa);
+
   const pd=document.getElementById('sv-pendiente');
   if(pd)pd.value=fmtMoneyDisplay(Math.max(0,p-i-recConv));
   // Mostrar equivalente si es USD
@@ -8278,11 +8324,7 @@ function confirmarVenta(nf){
   const inicial=parseMoney(document.getElementById('sv-inicial').value);
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(DB.config.tasaCambio||60);
-  const montoRecibido=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
-  const monedaRecibido=document.getElementById('sv-rec-moneda')?.value||'RD$';
-  // Convertir el monto recibido a la moneda de la venta antes de restarlo
-  const montoRecibidoConv=monedaRecibido===monedaVenta?montoRecibido:(monedaRecibido==='USD'?montoRecibido*tasa:montoRecibido/tasa);
-  const pendiente=Math.max(0,precio-inicial-montoRecibidoConv);
+  const pendiente=Math.max(0,precio-inicial);
   const banco=document.getElementById('sv-banco')?.value||'';
   const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const totalGastos=(DB.gastosVehiculos||[]).filter(g=>g.vehiculoId===vid).reduce((a,g)=>a+parseFloat(g.montoFactura||0),0);
@@ -8326,11 +8368,9 @@ function confirmarVenta(nf){
     const matEl=document.getElementById('sv-rec-mat-prev');
     const recVehNombre=document.getElementById('sv-rec-vehiculo')?.value||'';
     const recVin=document.getElementById('sv-rec-vin')?.value||'';
-    const recKm=parseFloat((document.getElementById('sv-rec-km')?.value||'0').replace(/,/g,''))||0;
-    const recMonto=parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,''));
-    const recMoneda=document.getElementById('sv-rec-moneda')?.value||'RD$';
+    const recPlaca=document.getElementById('sv-rec-placa')?.value||'EN TRÁMITE';
     const recMatricula=matEl?.style.display!=='none'&&matEl?.src?matEl.src:'';
-    venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,km:recKm,monto:recMonto,monedaRec:recMoneda,matricula:recMatricula};
+    venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,placa:recPlaca,matricula:recMatricula};
     // Registrar automáticamente como vehículo activo tipo RECIBIDO
     if(recVehNombre){
       // Parsear marca, modelo, año del texto libre
@@ -8663,16 +8703,9 @@ function editarVenta(vid){
         <div class="form-row c3" style="margin-bottom:8px">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Marca / Modelo</label><input type="text" id="sv-rec-vehiculo" value="${escHtml(rec.vehiculo||'')}" placeholder="Ej: Toyota Corolla 2018"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" value="${escHtml(rec.vin||'')}" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Kilometraje</label><input type="text" id="sv-rec-km" value="${rec.km||0}" placeholder="0" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" value="${(rec.placa||'')" placeholder="A-123456" maxlength="9" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase()"></div>
         </div>
-        <div class="form-row c3" style="margin-bottom:0">
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Monto Recibido</label><input type="text" id="sv-rec-monto" value="${rec.monto||0}" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Moneda</label>
-            <select id="sv-rec-moneda">
-              <option value="RD$" ${(rec.monedaRec||'RD$')!=='USD'?'selected':''}>RD$ — Pesos</option>
-              <option value="USD" ${rec.monedaRec==='USD'?'selected':''}>USD — Dólares</option>
-            </select>
-          </div>
+        <div class="form-row c2" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
             <input type="file" id="sv-rec-matricula" accept=".pdf,.jpg,.jpeg,.png,image/jpeg,image/png,application/pdf" onchange="previewFoto('sv-rec-matricula','sv-rec-mat-prev')">
             ${rec.matricula?`<img id="sv-rec-mat-prev" src="${rec.matricula}" style="display:block;width:100%;max-height:60px;object-fit:cover;border-radius:4px;margin-top:4px">`:`<img id="sv-rec-mat-prev" style="display:none;width:100%;max-height:60px;object-fit:cover;border-radius:4px;margin-top:4px">`}
@@ -8713,10 +8746,7 @@ function guardarEditarVenta(vid){
   const inicial=parseMoney(document.getElementById('sv-inicial').value);
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
-  const montoRecibidoEdit=document.getElementById('sv-tiene-recibido')?.checked?parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,'')):0;
-  const monedaRecibidoEdit=document.getElementById('sv-rec-moneda')?.value||'RD$';
-  const montoRecibidoEditConv=monedaRecibidoEdit===monedaVenta?montoRecibidoEdit:(monedaRecibidoEdit==='USD'?montoRecibidoEdit*tasa:montoRecibidoEdit/tasa);
-  const pendiente=Math.max(0,precio-inicial-montoRecibidoEditConv);
+  const pendiente=Math.max(0,precio-inicial);
   const banco=document.getElementById('sv-banco')?.value||'';
   const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const totalGastos=(DB.gastosVehiculos||[]).filter(g=>g.vehiculoId===vid2).reduce((a,g)=>a+parseFloat(g.montoFactura||0),0);
@@ -8755,9 +8785,7 @@ function guardarEditarVenta(vid){
     DB.ventas[i].vehiculoRecibido={
       vehiculo:document.getElementById('sv-rec-vehiculo')?.value||'',
       vin:document.getElementById('sv-rec-vin')?.value||'',
-      km:parseFloat((document.getElementById('sv-rec-km')?.value||'0').replace(/,/g,''))||0,
-      monto:parseFloat((document.getElementById('sv-rec-monto')?.value||'0').replace(/,/g,''))||0,
-      monedaRec:document.getElementById('sv-rec-moneda')?.value||'RD$',
+      placa:document.getElementById('sv-rec-placa')?.value||'EN TRÁMITE',
       matricula:matEl?.style.display!=='none'&&matEl?.src?matEl.src:(prevRec.matricula||'')
     };
     // Sincronizar el costo del vehículo ya registrado en Inventario (creado al momento de la venta)

@@ -2826,7 +2826,21 @@ function guardarVehiculo(id){
     const i=DB.vehiculos.findIndex(x=>x.id===id);
     if(i>=0){
       obj.costo=DB.vehiculos[i].costo||0;
+      obj.origenVenta=DB.vehiculos[i].origenVenta||''; // preservar referencia
       DB.vehiculos[i]=obj;
+      // Alerta si este vehículo fue recibido como parte de pago en una venta
+      if(obj.origenVenta){
+        const ventaOrigen=DB.ventas.find(v=>v.factura===obj.origenVenta);
+        if(ventaOrigen){
+          setTimeout(()=>{
+            if(confirm(`⚠️ Este vehículo fue recibido como parte de pago en la venta ${obj.origenVenta} (cliente: ${ventaOrigen.cliente||'—'}).\n\n¿Deseas ir a esa venta para actualizar también sus datos allí?`)){
+              closeModal();
+              showPage('ventas');
+              setTimeout(()=>{editarVenta(ventaOrigen.id);},400);
+            }
+          },300);
+        }
+      }
     }
   } else {
     obj.costo=0;
@@ -7430,7 +7444,7 @@ function nuevaVenta(){
         <div class="form-row c3" style="margin-bottom:8px">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Marca / Modelo</label><input type="text" id="sv-rec-vehiculo" placeholder="Ej: Toyota Corolla 2018"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" placeholder="A-123456" maxlength="9" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase()"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" placeholder="A123456" maxlength="8" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
         </div>
         <div class="form-row c2" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
@@ -7746,11 +7760,10 @@ function llenarInfoVenta(vid){
 }
 
 function calcPend(){
-  const p=parseFloat((document.getElementById('sv-precio')?.value||'0').replace(/,/g,''));
-  const i=parseFloat((document.getElementById('sv-inicial')?.value||'0').replace(/,/g,''));
+  const p=parseMoney(document.getElementById('sv-precio')?.value||'0');
+  const i=parseMoney(document.getElementById('sv-inicial')?.value||'0');
   const pd=document.getElementById('sv-pendiente');
   if(pd)pd.value=fmtMoneyDisplay(Math.max(0,p-i));
-  // Mostrar equivalente si es USD
   const moneda=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
   const wrap=document.getElementById('sv-equiv-wrap');
@@ -7766,7 +7779,7 @@ function calcPend(){
 }
 
 function confirmarVenta(nf){
-  const precio=parseFloat((document.getElementById('sv-precio').value||'0').replace(/,/g,''));
+  const precio=parseMoney(document.getElementById('sv-precio').value||'0');
   if(!precio){toast('Ingresa el precio de venta','error');return;}
   const vid=document.getElementById('sv-veh').value;
   if(!vid){toast('Selecciona un vehículo','error');return;}
@@ -7775,17 +7788,16 @@ function confirmarVenta(nf){
   const cli=DB.clientes.find(c=>c.id===cliId);
   const cliNombre=cli?.nombre||'Cliente';
   const v=DB.vehiculos.find(x=>x.id===vid);
-  const inicial=parseFloat((document.getElementById('sv-inicial').value||'0').replace(/,/g,''));
+  const inicial=parseMoney(document.getElementById('sv-inicial').value||'0');
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(DB.config.tasaCambio||60);
+  const montoRecibido=0;
   const pendiente=Math.max(0,precio-inicial);
   const banco=document.getElementById('sv-banco')?.value||'';
   const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const totalGastos=(DB.gastosVehiculos||[]).filter(g=>g.vehiculoId===vid).reduce((a,g)=>a+parseFloat(g.montoFactura||0),0);
-  // Estado automático según pendiente
-  // Estado automático: VENDIDO si pago completo, si no TRÁNSITO
-  const fechaEntregaNew=document.getElementById('sv-fecha-entrega')?.value||'';
-  const estadoAuto=(pendiente<=0&&fechaEntregaNew)?'VENDIDO':'TRÁNSITO';
+  // Estado automático: siempre TRÁNSITO hasta registrar entrega
+  const estadoAuto='TRÁNSITO';
   const tipoTransferencia=document.getElementById('sv-tipo-transferencia')?.value||'endoso';
   const montoTraspaso=tipoTransferencia==='traspaso'?parseFloat((document.getElementById('sv-traspaso-monto')?.value||'0').replace(/,/g,'')):0;
   const montoEndoso=tipoTransferencia==='endoso'?parseFloat((document.getElementById('sv-endoso-monto')?.value||'0').replace(/,/g,'')):0;
@@ -7834,18 +7846,15 @@ function confirmarVenta(nf){
     venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,placa:recPlaca,matricula:recMatricula};
     // Registrar automáticamente como vehículo activo tipo RECIBIDO
     if(recVehNombre){
-      // Parsear marca, modelo, año del texto libre
       const partes=recVehNombre.trim().split(' ');
       const anioMatch=partes.find(p=>/^(19|20)\d{2}$/.test(p));
       const marca=partes[0]||'Sin Marca';
       const modelo=partes.slice(1).filter(p=>p!==anioMatch).join(' ')||'Sin Modelo';
       const anio=anioMatch?parseInt(anioMatch):new Date().getFullYear();
-      // Generar código automático
       const nums=DB.vehiculos.map(v=>{const m=(v.codigo||'').match(/(\d+)$/);return m?parseInt(m[1]):0;});
       const nextNum=(nums.length?Math.max(...nums):0)+1;
       const pref=getPrefijo();
       const nuevoCodigo=pref+'-'+String(nextNum).padStart(5,'0');
-      // Verificar que no exista el chasis
       const vinExiste=recVin&&DB.vehiculos.find(v=>v.vin&&v.vin.toUpperCase()===recVin.toUpperCase());
       if(!vinExiste){
         const nuevoVeh={
@@ -7861,8 +7870,8 @@ function confirmarVenta(nf){
           fecha:venta.fecha,
           notas:`Recibido como parte de pago. Venta: ${nf} — Cliente: ${cliNombre}.`,
           propietario:DB.config.propietarios?.[0]||'',
-          color:'',placa:'',carfax:'',foto:'',precioVenta:0,
-          origenVenta:nf // referencia a la venta de origen
+          color:'',carfax:'',foto:'',precioVenta:0,
+          origenVenta:nf
         };
         DB.vehiculos.push(nuevoVeh);
         sDB('vehiculos');
@@ -8113,7 +8122,7 @@ function nuevaVenta(){
         <div class="form-row c3" style="margin-bottom:8px">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Marca / Modelo</label><input type="text" id="sv-rec-vehiculo" placeholder="Ej: Toyota Corolla 2018"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" placeholder="A-123456" maxlength="9" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase()"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" placeholder="A123456" maxlength="8" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
         </div>
         <div class="form-row c2" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
@@ -8291,12 +8300,10 @@ function llenarInfoVenta(vid){
 }
 
 function calcPend(){
-  const p=parseMoney(document.getElementById('sv-precio')?.value);
-  const i=parseMoney(document.getElementById('sv-inicial')?.value);
-
+  const p=parseMoney(document.getElementById('sv-precio')?.value||'0');
+  const i=parseMoney(document.getElementById('sv-inicial')?.value||'0');
   const moneda=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
-
   const pd=document.getElementById('sv-pendiente');
   if(pd)pd.value=fmtMoneyDisplay(Math.max(0,p-i));
   // Mostrar equivalente si es USD
@@ -8322,18 +8329,21 @@ function confirmarVenta(nf){
   const cli=DB.clientes.find(c=>c.id===cliId);
   const cliNombre=cli?.nombre||'Cliente';
   const v=DB.vehiculos.find(x=>x.id===vid);
-  const inicial=parseMoney(document.getElementById('sv-inicial').value);
+  const inicial=parseMoney(document.getElementById('sv-inicial').value||'0');
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(DB.config.tasaCambio||60);
+  // Vehículo recibido: leer monto ANTES de calcular pendiente
+  const tieneRecibidoCheck=document.getElementById('sv-tiene-recibido')?.checked||false;
+  const montoRecibido=0;
   const pendiente=Math.max(0,precio-inicial);
   const banco=document.getElementById('sv-banco')?.value||'';
   const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
   const totalGastos=(DB.gastosVehiculos||[]).filter(g=>g.vehiculoId===vid).reduce((a,g)=>a+parseFloat(g.montoFactura||0),0);
-  // Estado automático según pendiente
-  const estadoAuto='TRÁNSITO'; // Siempre TRÁNSITO hasta que se registre la entrega
+  // Estado automático: siempre TRÁNSITO hasta registrar entrega
+  const estadoAuto='TRÁNSITO';
   const tipoTransferencia=document.getElementById('sv-tipo-transferencia')?.value||'endoso';
-  const montoTraspaso=tipoTransferencia==='traspaso'?parseFloat((document.getElementById('sv-traspaso-monto')?.value||'0').replace(/,/g,'')):0;
-  const montoEndoso=tipoTransferencia==='endoso'?parseFloat((document.getElementById('sv-endoso-monto')?.value||'0').replace(/,/g,'')):0;
+  const montoTraspaso=tipoTransferencia==='traspaso'?parseMoney(document.getElementById('sv-traspaso-monto')?.value||'0'):0;
+  const montoEndoso=tipoTransferencia==='endoso'?parseMoney(document.getElementById('sv-endoso-monto')?.value||'0'):0;
   const gestorTransf=document.getElementById('sv-gestor')?.value||'';
   const traspasoPagadoCliente=(document.getElementById('sv-traspaso-pagado')?.value||'si')==='si';
   const comentarioVenta=document.getElementById('sv-comentario')?.value||'';
@@ -8364,7 +8374,7 @@ function confirmarVenta(nf){
     millajeVenta:parseFloat((document.getElementById('sv-millaje-venta')?.value||'0').replace(/,/g,''))||0
   };
   // Vehículo recibido
-  const tieneRecibido=document.getElementById('sv-tiene-recibido')?.checked;
+  const tieneRecibido=tieneRecibidoCheck;
   if(tieneRecibido){
     const matEl=document.getElementById('sv-rec-mat-prev');
     const recVehNombre=document.getElementById('sv-rec-vehiculo')?.value||'';
@@ -8374,18 +8384,15 @@ function confirmarVenta(nf){
     venta.vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,placa:recPlaca,matricula:recMatricula};
     // Registrar automáticamente como vehículo activo tipo RECIBIDO
     if(recVehNombre){
-      // Parsear marca, modelo, año del texto libre
       const partes=recVehNombre.trim().split(' ');
       const anioMatch=partes.find(p=>/^(19|20)\d{2}$/.test(p));
       const marca=partes[0]||'Sin Marca';
       const modelo=partes.slice(1).filter(p=>p!==anioMatch).join(' ')||'Sin Modelo';
       const anio=anioMatch?parseInt(anioMatch):new Date().getFullYear();
-      // Generar código automático
       const nums=DB.vehiculos.map(v=>{const m=(v.codigo||'').match(/(\d+)$/);return m?parseInt(m[1]):0;});
       const nextNum=(nums.length?Math.max(...nums):0)+1;
       const pref=getPrefijo();
       const nuevoCodigo=pref+'-'+String(nextNum).padStart(5,'0');
-      // Verificar que no exista el chasis
       const vinExiste=recVin&&DB.vehiculos.find(v=>v.vin&&v.vin.toUpperCase()===recVin.toUpperCase());
       if(!vinExiste){
         const nuevoVeh={
@@ -8393,16 +8400,16 @@ function confirmarVenta(nf){
           codigo:nuevoCodigo,
           marca,modelo,anio,
           vin:recVin,
-          millas:recKm,
+          placa:recPlaca,
           status:'ACTIVO',
           tipoCompra:'RECIBIDO',
-          suplidor:cliNombre, // El cliente que lo entregó
-          costo:recMoneda==='USD'?recMonto*parseFloat(DB.config.tasaCambio||60):recMonto,     // Costo en RD$ (convertido si se recibió en USD)
+          suplidor:cliNombre,
+          costo:0,
           fecha:venta.fecha,
-          notas:`Recibido como parte de pago. Venta: ${nf} — Cliente: ${cliNombre}. Valor recibido: ${recMoneda==='USD'?'$'+recMonto.toLocaleString('en-US',{minimumFractionDigits:2})+' USD':'RD$'+recMonto.toLocaleString('es-DO',{minimumFractionDigits:2})}`,
+          notas:`Recibido como parte de pago. Venta: ${nf} — Cliente: ${cliNombre}.`,
           propietario:DB.config.propietarios?.[0]||'',
-          color:'',placa:'',carfax:'',foto:'',precioVenta:0,
-          origenVenta:nf // referencia a la venta de origen
+          color:'',carfax:'',foto:'',precioVenta:0,
+          origenVenta:nf
         };
         DB.vehiculos.push(nuevoVeh);
         sDB('vehiculos');
@@ -8639,13 +8646,13 @@ function editarVenta(vid){
     </div>
     <div class="form-row c3">
       <div class="form-field"><label class="required">Precio de Venta</label>
-        <input type="text" id="sv-precio" value="${v.precioVenta||0}" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()">
+        <input type="text" id="sv-precio" value="${fmtMoneyDisplay(v.precioVenta||0)}" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()">
       </div>
       <div class="form-field"><label>Inicial Recibido</label>
-        <input type="text" id="sv-inicial" value="${v.inicial||0}" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()">
+        <input type="text" id="sv-inicial" value="${fmtMoneyDisplay(v.inicial||0)}" placeholder="0.00" oninput="fmtMoneyInput(this);calcPend()">
       </div>
       <div class="form-field"><label>Pendiente</label>
-        <input type="text" id="sv-pendiente" value="${v.pendiente||0}" readonly style="background:#f8fafc;font-weight:700;color:var(--red)">
+        <input type="text" id="sv-pendiente" value="${fmtMoneyDisplay(v.pendiente||0)}" readonly style="background:#f8fafc;font-weight:700;color:var(--red)">
       </div>
     </div>
     <div style="background:var(--blue3);border-radius:8px;padding:12px;margin-top:8px">
@@ -8704,7 +8711,7 @@ function editarVenta(vid){
         <div class="form-row c3" style="margin-bottom:8px">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Marca / Modelo</label><input type="text" id="sv-rec-vehiculo" value="${escHtml(rec.vehiculo||'')}" placeholder="Ej: Toyota Corolla 2018"></div>
           <div class="form-field" style="margin:0"><label style="font-size:10px">Chasis / VIN</label><input type="text" id="sv-rec-vin" value="${escHtml(rec.vin||'')}" placeholder="Número de chasis o VIN" maxlength="17" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
-          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" value="${rec.placa||''}" placeholder="A-123456" maxlength="9" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase()"></div>
+          <div class="form-field" style="margin:0"><label style="font-size:10px">Placa</label><input type="text" id="sv-rec-placa" value="${(rec.placa||'').replace(/-/g,'')}" placeholder="A123456" maxlength="8" style="text-transform:uppercase;letter-spacing:1px" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"></div>
         </div>
         <div class="form-row c2" style="margin-bottom:0">
           <div class="form-field" style="margin:0"><label style="font-size:10px">Adjuntar Matrícula</label>
@@ -8713,7 +8720,7 @@ function editarVenta(vid){
           </div>
         </div>
         <div style="font-size:11px;color:var(--blue);padding:8px;background:#fff;border-radius:6px;margin-top:8px">
-          ℹ️ Al guardar, esto también actualiza el costo del vehículo recibido ya registrado en Inventario.
+          ℹ️ Al guardar, esto también actualiza el registro del vehículo en Inventario. Si se desmarca, el vehículo se eliminará del Inventario (solo si no tiene movimientos).
         </div>
       </div>
     </div>
@@ -8744,9 +8751,11 @@ function guardarEditarVenta(vid){
   const cliNombre=cli?.nombre||'Cliente';
   const nuevoVeh=DB.vehiculos.find(x=>x.id===vid2);
   if(!nuevoVeh){toast('Vehículo no encontrado','error');return;}
-  const inicial=parseMoney(document.getElementById('sv-inicial').value);
+  const inicial=parseMoney(document.getElementById('sv-inicial').value||'0');
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
+  const tieneRecibidoEdit=document.getElementById('sv-tiene-recibido')?.checked||false;
+  const montoRecibido=0;
   const pendiente=Math.max(0,precio-inicial);
   const banco=document.getElementById('sv-banco')?.value||'';
   const cuenta=document.getElementById('sv-cuenta')?.value||'Caja General';
@@ -8779,29 +8788,73 @@ function guardarEditarVenta(vid){
   DB.ventas[i].comentario=document.getElementById('sv-comentario')?.value||'';
   DB.ventas[i].garantia=document.getElementById('sv-garantia')?.value.trim()||'';
   DB.ventas[i].millajeVenta=parseFloat((document.getElementById('sv-millaje-venta')?.value||'0').replace(/,/g,''))||0;
-  // Vehículo recibido como parte de pago (corrección de monto/moneda)
-  if(document.getElementById('sv-tiene-recibido')?.checked){
+  // Vehículo recibido como parte de pago — sincronización con Inventario (Opción B)
+  if(tieneRecibidoEdit){
     const matEl=document.getElementById('sv-rec-mat-prev');
     const prevRec=DB.ventas[i].vehiculoRecibido||{};
-    DB.ventas[i].vehiculoRecibido={
-      vehiculo:document.getElementById('sv-rec-vehiculo')?.value||'',
-      vin:document.getElementById('sv-rec-vin')?.value||'',
-      placa:document.getElementById('sv-rec-placa')?.value||'EN TRÁMITE',
-      matricula:matEl?.style.display!=='none'&&matEl?.src?matEl.src:(prevRec.matricula||'')
-    };
-    // Sincronizar el costo del vehículo ya registrado en Inventario (creado al momento de la venta)
-    const recActual=DB.ventas[i].vehiculoRecibido;
-    const costoRD=recActual.monedaRec==='USD'?recActual.monto*parseFloat(DB.config.tasaCambio||60):recActual.monto;
+    const recVehNombre=document.getElementById('sv-rec-vehiculo')?.value||'';
+    const recVin=document.getElementById('sv-rec-vin')?.value||'';
+    const recPlaca=document.getElementById('sv-rec-placa')?.value||'EN TRÁMITE';
+    const recMatricula=matEl?.style.display!=='none'&&matEl?.src?matEl.src:(prevRec.matricula||'');
+    DB.ventas[i].vehiculoRecibido={vehiculo:recVehNombre,vin:recVin,placa:recPlaca,matricula:recMatricula};
+    // Sincronizar en Inventario el vehículo ya registrado (buscar por origenVenta)
     const vehRecIdx=DB.vehiculos.findIndex(x=>x.origenVenta===DB.ventas[i].factura);
     if(vehRecIdx>=0){
-      DB.vehiculos[vehRecIdx].costo=costoRD;
-      if(recActual.vin)DB.vehiculos[vehRecIdx].vin=recActual.vin;
-      if(recActual.km)DB.vehiculos[vehRecIdx].millas=recActual.km;
-      DB.vehiculos[vehRecIdx].notas=`Recibido como parte de pago. Venta: ${DB.ventas[i].factura} — Cliente: ${cliNombre}. Valor recibido: ${recActual.monedaRec==='USD'?'$'+recActual.monto.toLocaleString('en-US',{minimumFractionDigits:2})+' USD':'RD$'+recActual.monto.toLocaleString('es-DO',{minimumFractionDigits:2})}`;
+      // Actualizar datos del vehículo existente
+      if(recVehNombre){
+        const partes=recVehNombre.trim().split(' ');
+        const anioMatch=partes.find(p=>/^(19|20)\d{2}$/.test(p));
+        DB.vehiculos[vehRecIdx].marca=partes[0]||DB.vehiculos[vehRecIdx].marca;
+        DB.vehiculos[vehRecIdx].modelo=partes.slice(1).filter(p=>p!==anioMatch).join(' ')||DB.vehiculos[vehRecIdx].modelo;
+        if(anioMatch)DB.vehiculos[vehRecIdx].anio=parseInt(anioMatch);
+      }
+      if(recVin)DB.vehiculos[vehRecIdx].vin=recVin;
+      DB.vehiculos[vehRecIdx].placa=recPlaca;
+      DB.vehiculos[vehRecIdx].notas=`Recibido como parte de pago. Venta: ${DB.ventas[i].factura} — Cliente: ${cliNombre}.`;
       sDB('vehiculos');
-      toast('✅ Costo del vehículo recibido actualizado en Inventario','success');
+      toast('✅ Vehículo recibido actualizado en Inventario','success');
+    } else if(recVehNombre){
+      // No existía en inventario — crearlo ahora
+      const partes=recVehNombre.trim().split(' ');
+      const anioMatch=partes.find(p=>/^(19|20)\d{2}$/.test(p));
+      const marca=partes[0]||'Sin Marca';
+      const modelo=partes.slice(1).filter(p=>p!==anioMatch).join(' ')||'Sin Modelo';
+      const anio=anioMatch?parseInt(anioMatch):new Date().getFullYear();
+      const nums=DB.vehiculos.map(v=>{const m=(v.codigo||'').match(/(\d+)$/);return m?parseInt(m[1]):0;});
+      const nextNum=(nums.length?Math.max(...nums):0)+1;
+      const pref=getPrefijo();
+      const nuevoCodigo=pref+'-'+String(nextNum).padStart(5,'0');
+      const vinExiste=recVin&&DB.vehiculos.find(v=>v.vin&&v.vin.toUpperCase()===recVin.toUpperCase());
+      if(!vinExiste){
+        DB.vehiculos.push({
+          id:uid(),codigo:nuevoCodigo,marca,modelo,anio,vin:recVin,placa:recPlaca,
+          status:'ACTIVO',tipoCompra:'RECIBIDO',suplidor:cliNombre,costo:0,
+          fecha:DB.ventas[i].fecha,
+          notas:`Recibido como parte de pago. Venta: ${DB.ventas[i].factura} — Cliente: ${cliNombre}.`,
+          propietario:DB.config.propietarios?.[0]||'',
+          color:'',carfax:'',foto:'',precioVenta:0,
+          origenVenta:DB.ventas[i].factura
+        });
+        sDB('vehiculos');
+        toast(`✅ Vehículo recibido registrado en Inventario: ${nuevoCodigo}`,'success');
+      }
     }
   } else if(document.getElementById('sv-tiene-recibido')){
+    // Se desmarcó "incluir vehículo recibido" → eliminar de inventario si existía
+    const vehRecIdx=DB.vehiculos.findIndex(x=>x.origenVenta===DB.ventas[i].factura);
+    if(vehRecIdx>=0){
+      const vehRec=DB.vehiculos[vehRecIdx];
+      // Solo eliminar si no tiene ventas ni gastos asociados
+      const tieneVenta=DB.ventas.some(x=>x.vehiculoId===vehRec.id);
+      const tieneGastos=(DB.gastosVehiculos||[]).some(x=>x.vehiculoId===vehRec.id&&!x.esTransferencia);
+      if(!tieneVenta&&!tieneGastos){
+        DB.vehiculos.splice(vehRecIdx,1);
+        sDB('vehiculos');
+        toast('🗑️ Vehículo recibido eliminado del Inventario','warning');
+      } else {
+        toast('⚠️ El vehículo recibido tiene movimientos en el sistema — no se eliminó del Inventario. Revísalo manualmente.','warning');
+      }
+    }
     DB.ventas[i].vehiculoRecibido=null;
   }
   // Si cambió el vehículo: revertir el anterior y aplicar status al nuevo
@@ -8818,15 +8871,16 @@ function guardarEditarVenta(vid){
   sDB('vehiculos');
   // Actualizar CxC principal (pendiente de venta) — excluye la de traspaso si existe
   const ci=DB.cxc.findIndex(x=>x.ventaId===vid&&!x.esTraspaso);
+  const abonadoTotal=inicial+montoRecibido;
   if(ci>=0){
     DB.cxc[ci].cliente=cliNombre;DB.cxc[ci].clienteId=cliId;
     DB.cxc[ci].vehiculo=`${nuevoVeh.codigo} ${nuevoVeh.marca} ${nuevoVeh.modelo}`;
     DB.cxc[ci].moneda=monedaVenta;DB.cxc[ci].total=precio;
-    DB.cxc[ci].abonado=inicial;DB.cxc[ci].saldo=pendiente;
-    DB.cxc[ci].status=pendiente<=0?'SALDADO':inicial>0?'PARCIAL':'PENDIENTE';
+    DB.cxc[ci].abonado=abonadoTotal;DB.cxc[ci].saldo=pendiente;
+    DB.cxc[ci].status=pendiente<=0?'SALDADO':abonadoTotal>0?'PARCIAL':'PENDIENTE';
     sDB('cxc');
   } else if(pendiente>0){
-    DB.cxc.push({id:uid(),ventaId:vid,factura:DB.ventas[i].factura,cliente:cliNombre,clienteId:cliId,vehiculo:`${nuevoVeh.codigo} ${nuevoVeh.marca} ${nuevoVeh.modelo}`,concepto:'Pendiente de venta',moneda:monedaVenta,total:precio,abonado:inicial,saldo:pendiente,fecha:DB.ventas[i].fecha,fechaVence:'',status:inicial>0?'PARCIAL':'PENDIENTE',pagos:[]});
+    DB.cxc.push({id:uid(),ventaId:vid,factura:DB.ventas[i].factura,cliente:cliNombre,clienteId:cliId,vehiculo:`${nuevoVeh.codigo} ${nuevoVeh.marca} ${nuevoVeh.modelo}`,concepto:'Pendiente de venta',moneda:monedaVenta,total:precio,abonado:abonadoTotal,saldo:pendiente,fecha:DB.ventas[i].fecha,fechaVence:'',status:abonadoTotal>0?'PARCIAL':'PENDIENTE',pagos:[]});
     sDB('cxc');
   }
   // ═══ Sincronizar CxP al gestor (Endoso/Traspaso) y CxC de Traspaso al cliente ═══
@@ -9033,6 +9087,7 @@ function imprimirFactura(vid){
         <div class="campo"><label>Chasis / VIN</label><span>${escHtml((rec.vin||'—').toUpperCase())}</span></div>
         <div class="campo"><label>Placa</label><span class="placa-badge">${escHtml((rec.placa||'EN TRÁMITE').toUpperCase())}</span></div>
       </div>
+      ${parseFloat(rec.monto||0)>0?`<div style="margin-top:6px;padding-top:5px;border-top:1px solid #cdd8e8;display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#64748b">Valor Recibido</span><span style="font-size:12px;font-weight:800;color:#083a70">${rec.moneda==='USD'?'USD $'+parseFloat(rec.monto).toLocaleString('en-US',{minimumFractionDigits:2}):'RD$ '+parseFloat(rec.monto).toLocaleString('es-DO',{minimumFractionDigits:2})}</span></div>`:''}
     </div>
   </div>`:''}
 
@@ -9044,6 +9099,7 @@ function imprimirFactura(vid){
   <div class="fin-wrap">
     <table class="fin-tabla">
       <tr class="fin-inicial"><td class="lbl">Inicial Pagado</td><td class="val">${fV(v.inicial||0)}</td></tr>
+      ${rec?.vehiculo&&parseFloat(rec.monto||0)>0?`<tr class="fin-inicial"><td class="lbl">Vehículo Recibido</td><td class="val">${rec.moneda==='USD'?'USD $'+parseFloat(rec.monto).toLocaleString('en-US',{minimumFractionDigits:2}):'RD$ '+parseFloat(rec.monto).toLocaleString('es-DO',{minimumFractionDigits:2})}</td></tr>`:''}
       <tr class="fin-pend"><td>Pendiente Pagar</td><td class="val" style="text-align:right">${fV(v.pendiente||0)}</td></tr>
       <tr class="fin-total"><td>Total de la Venta</td><td style="text-align:right;font-weight:800;color:#fff">${fV(v.precioVenta)}</td></tr>
     </table>

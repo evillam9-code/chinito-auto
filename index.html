@@ -8298,7 +8298,7 @@ function calcPend(){
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
 
   const pd=document.getElementById('sv-pendiente');
-  if(pd)pd.value=fmtMoneyDisplay(Math.max(0,p-i-recConv));
+  if(pd)pd.value=fmtMoneyDisplay(Math.max(0,p-i));
   // Mostrar equivalente si es USD
   const wrap=document.getElementById('sv-equiv-wrap');
   const equiv=document.getElementById('sv-equiv');

@@ -1812,12 +1812,7 @@ function showPage(id){
 }
 
 function showNotif(title,msg,type='danger'){
-  const c=document.getElementById('alert-container');if(!c)return;
-  const ico=type==='danger'?'⚠️':'🔔';
-  const d=document.createElement('div');
-  d.className='alert-notif'+(type==='warning'?' warning':'');
-  d.innerHTML=`<div class="notif-ico">${ico}</div><div class="notif-body"><div class="notif-title">${title}</div><div class="notif-msg">${msg}</div></div><div class="notif-close" onclick="this.parentElement.remove()">✕</div>`;
-  c.appendChild(d);
+  // Notificaciones visuales flotantes desactivadas — usar módulo Alertas del Sistema
 }
 function checkAlerts(){
   const c=document.getElementById('alert-container');if(c)c.innerHTML='';
@@ -5089,22 +5084,27 @@ function imprimirAlertasFiltradas(){
   win.document.close();
 }
 function exportarAlertasPDF(){
-  const hoy=today();const hoyDate=new Date();
-  const alertas=[];
-  DB.vehiculos.filter(v=>v.status!=='VENDIDO'&&!v.vin).forEach(v=>alertas.push({nivel:'🔴',titulo:'Sin Chasis/VIN',msg:`${v.codigo||''} ${v.marca} ${v.modelo} ${v.anio}`}));
-  DB.vehiculos.filter(v=>v.status!=='VENDIDO'&&!(DB.gastosVehiculos||[]).some(g=>g.vehiculoId===v.id)).forEach(v=>alertas.push({nivel:'🟡',titulo:'Sin costos',msg:`${v.codigo||''} ${v.marca} ${v.modelo}`}));
-  (DB.gastosVehiculos||[]).filter(g=>parseFloat(g.montoPendiente||0)>0).forEach(g=>{const v=DB.vehiculos.find(x=>x.id===g.vehiculoId);alertas.push({nivel:'🔴',titulo:'CxP Pendiente',msg:`${v?v.codigo:'?'} ${g.tipo} ${fmt(g.montoPendiente)}`});});
-  (DB.cxc||[]).filter(x=>(x.status==='PENDIENTE'||x.status==='PARCIAL')&&x.fechaVence&&x.fechaVence<=hoy).forEach(x=>alertas.push({nivel:'🔴',titulo:'CxC Vencida',msg:`${x.cliente} — ${fmt(x.saldo)}`}));
-  DB.vehiculos.filter(v=>v.status!=='VENDIDO'&&v.fecha).forEach(v=>{const d=Math.floor((hoyDate-new Date(v.fecha+'T12:00:00'))/(1000*60*60*24));if(d>=365)alertas.push({nivel:'🔴',titulo:'1 Año sin vender',msg:`${v.codigo} ${v.marca} ${v.modelo} — ${d} días`});else if(d>=180)alertas.push({nivel:'🟡',titulo:'6 Meses sin vender',msg:`${v.codigo} ${v.marca} ${v.modelo} — ${d} días`});});
+  // Exportar respetando filtros activos
+  const tipo=document.getElementById('filtro-alerta-tipo')?.value||'';
+  const modulo=document.getElementById('filtro-alerta-modulo')?.value||'';
+  const nivel=document.getElementById('filtro-alerta-nivel')?.value||'';
+  let lista=(window._todasAlertas||[]);
+  if(tipo)lista=lista.filter(a=>a.tipo===tipo);
+  if(modulo)lista=lista.filter(a=>a.modulo===modulo);
+  if(nivel)lista=lista.filter(a=>a.nivel===nivel);
+  const hoy=today();
+  const labelNivel={'danger':'🔴 CRÍTICA','warning':'🟡 ADVERTENCIA'};
+  const filtrosDesc=[tipo?'Tipo: '+tipo:'',modulo?'Módulo: '+modulo:'',nivel?'Nivel: '+nivel:''].filter(Boolean).join(' | ');
   const win=window.open('','_blank','width=800,height=600');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Alertas</title><style>body{font-family:Arial,sans-serif;padding:24px;font-size:12px}h2{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#0f172a;color:#fff;padding:8px;font-size:11px;text-align:left}td{padding:8px;border-bottom:1px solid #e2e8f0}@media print{button{display:none}}</style></head><body>
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Alertas</title><style>body{font-family:Arial,sans-serif;padding:24px;font-size:12px}h2{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#083a70;color:#fff;padding:8px;font-size:11px;text-align:left}td{padding:8px;border-bottom:1px solid #e2e8f0}.r{color:#dc2626;font-weight:700}.w{color:#d97706;font-weight:700}@media print{button{display:none}}</style></head><body>
   ${DB.config.logoData?`<img src="${DB.config.logoData}" style="max-height:50px;margin-bottom:8px;display:block">`:''}
-  <h2>${escHtml(DB.config.empresa||'MAEDIG')} — REPORTE DE ALERTAS</h2>
-  <div style="color:#6b7280;font-size:11px;margin-bottom:16px">Fecha: ${fmtDate(hoy)} | Total: ${alertas.length} alertas</div>
-  <table><thead><tr><th>Nivel</th><th>Tipo</th><th>Detalle</th></tr></thead><tbody>
-  ${alertas.map(a=>`<tr><td>${a.nivel}</td><td style="font-weight:700">${escHtml(a.titulo)}</td><td>${escHtml(a.msg)}</td></tr>`).join('')}
+  <h2>${escHtml(DB.config.empresa||'CHINITO AUTO IMPORT')} — REPORTE DE ALERTAS</h2>
+  <div style="color:#6b7280;font-size:11px;margin-bottom:4px">Fecha: ${fmtDate(hoy)} | Total: ${lista.length} alerta(s)</div>
+  ${filtrosDesc?`<div style="color:#2563eb;font-size:11px;margin-bottom:16px">Filtros: ${filtrosDesc}</div>`:'<div style="margin-bottom:16px"></div>'}
+  <table><thead><tr><th>Nivel</th><th>Módulo</th><th>Tipo / Alerta</th><th>Detalle</th></tr></thead><tbody>
+  ${lista.map(a=>`<tr><td class="${a.nivel==='danger'?'r':'w'}">${labelNivel[a.nivel]||a.nivel}</td><td style="text-transform:uppercase;font-weight:600">${escHtml(a.modulo||'—')}</td><td style="font-weight:700">${escHtml(a.titulo)}</td><td>${escHtml(a.msg)}</td></tr>`).join('')}
   </tbody></table>
-  <div style="margin-top:20px;text-align:center"><button onclick="window.print()" style="padding:10px 24px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Imprimir PDF</button></div>
+  <div style="margin-top:20px;text-align:center"><button onclick="window.print()" style="padding:10px 24px;background:#083a70;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">🖨️ Imprimir / PDF</button></div>
   </body></html>`);
   win.document.close();
 }

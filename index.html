@@ -9564,15 +9564,15 @@ function imprimirCotizacion(i){
 
     <!-- DATOS DEL VEHÍCULO -->
     <table class="datos-table">
-      <tr><td>Nombre:</td><td>${escHtml(c.cliente||'—')}</td></tr>
-      <tr><td>${escHtml(c.tipoDoc||'RNC')}:</td><td>${escHtml(c.documento||c.cedula||'—')}</td></tr>
-      <tr><td>Tipo:</td><td>${escHtml(vObj?.tipo||c.tipo||'JEEPETA')}</td></tr>
-      <tr><td>Marca</td><td>${escHtml(vObj?.marca||c.marca||'—')}</td></tr>
-      <tr><td>Modelo:</td><td>${escHtml(vObj?.modelo||c.modelo||'—')}</td></tr>
+      <tr><td>Nombre:</td><td>${escHtml((c.cliente||'—').toUpperCase())}</td></tr>
+      <tr><td>${escHtml(c.tipoDoc||'RNC')}:</td><td>${escHtml((c.documento||c.cedula||'—').toUpperCase())}</td></tr>
+      <tr><td>Tipo:</td><td>${escHtml((vObj?.tipo||c.tipo||'JEEPETA').toUpperCase())}</td></tr>
+      <tr><td>Marca</td><td>${escHtml((vObj?.marca||c.marca||'—').toUpperCase())}</td></tr>
+      <tr><td>Modelo:</td><td>${escHtml((vObj?.modelo||c.modelo||'—').toUpperCase())}</td></tr>
       <tr><td>Año:</td><td>${escHtml(String(vObj?.anio||c.anio||'—'))}</td></tr>
-      <tr><td>Color:</td><td>${escHtml(vObj?.color||c.color||'—')}</td></tr>
-      <tr><td>Chasis:</td><td style="font-family:monospace">${escHtml(vObj?.vin||c.vin||'—')}</td></tr>
-      <tr><td>Placa:</td><td>${escHtml(vObj?.placa||c.placa||'TRAMITE')}</td></tr>
+      <tr><td>Color:</td><td>${escHtml((vObj?.color||c.color||'—').toUpperCase())}</td></tr>
+      <tr><td>Chasis:</td><td style="font-family:monospace">${escHtml((vObj?.vin||c.vin||'—').toUpperCase())}</td></tr>
+      <tr><td>Placa:</td><td>${escHtml((vObj?.placa||c.placa||'TRAMITE').toUpperCase())}</td></tr>
       <tr><td>Precio:</td><td><span class="precio-val">${fV(c.precio)}</span></td></tr>
     </table>
 

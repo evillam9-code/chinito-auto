@@ -9391,8 +9391,8 @@ function nuevaCotizacion(){
     </div>
     <div class="form-row c3">
       <div class="form-field"><label>Teléfono</label><input type="text" id="cot-tel" maxlength="12" placeholder="000-000-0000" oninput="fmtTelInput(this)"></div>
-      <div class="form-field"><label class="required">Entidad Bancaria</label>
-        <select id="cot-banco" class="no-upper"><option value="">Seleccionar...</option>${bancos.map(b=>`<option>${escHtml(b)}</option>`).join('')}</select>
+      <div class="form-field"><label>Entidad Bancaria</label>
+        <select id="cot-banco" class="no-upper"><option value="A QUIEN PUEDA INTERESAR">A QUIEN PUEDA INTERESAR</option>${bancos.map(b=>`<option>${escHtml(b)}</option>`).join('')}</select>
       </div>
       <div class="form-field"><label>Fecha</label><input type="date" id="cot-fecha" value="${today()}"></div>
     </div>
@@ -9437,7 +9437,6 @@ function guardarCotizacion(idx){
   const precio=parseMoney(document.getElementById('cot-precio').value);
   if(!cli){toast('El nombre es requerido','error');return;}
   if(!doc){toast('El documento es requerido','error');return;}
-  if(!banco){toast('Selecciona la entidad bancaria','error');return;}
   if(!precio){toast('El monto es requerido','error');return;}
   const vidSel=document.getElementById('cot-veh').value;
   const vObj=vidSel?DB.vehiculos.find(v=>v.id===vidSel):null;
@@ -9469,7 +9468,7 @@ function editarCotizacion(i){
     </div>
     <div class="form-row c3">
       <div class="form-field"><label>Teléfono</label><input type="text" id="cot-tel" value="${escHtml(c.telefono||'')}" maxlength="12" oninput="fmtTelInput(this)"></div>
-      <div class="form-field"><label>Banco</label><select id="cot-banco" class="no-upper">${bancos.map(b=>`<option ${b===c.banco?'selected':''}>${escHtml(b)}</option>`).join('')}</select></div>
+      <div class="form-field"><label>Banco</label><select id="cot-banco" class="no-upper"><option value="A QUIEN PUEDA INTERESAR" ${'A QUIEN PUEDA INTERESAR'===c.banco?'selected':''}>A QUIEN PUEDA INTERESAR</option>${bancos.map(b=>`<option ${b===c.banco?'selected':''}>${escHtml(b)}</option>`).join('')}</select></div>
       <div class="form-field"><label>Fecha</label><input type="date" id="cot-fecha" value="${c.fecha||today()}"></div>
     </div>
     <div class="form-row c3">
@@ -9554,7 +9553,7 @@ function imprimirCotizacion(i){
     <div class="doc-date">${fmtDate(c.fecha)}</div>
 
     <!-- SEÑORES -->
-    <div class="senores">Señores: <strong>A QUIEN PUEDA INTERESAR</strong></div>
+    <div class="senores">Señores: <strong>${escHtml((c.banco||'A QUIEN PUEDA INTERESAR').toUpperCase())}</strong></div>
     <div class="senores">Ciudad. <span>${escHtml(DB.config.ciudad||'SANTIAGO')}</span></div>
 
     <!-- INTRO -->

@@ -7875,6 +7875,7 @@ function confirmarVenta(nf){
   const inicial=parseMoney(document.getElementById('sv-inicial').value||'0');
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(DB.config.tasaCambio||60);
+  const tieneRecibido=document.getElementById('sv-tiene-recibido')?.checked||false;
   const montoRecibido=tieneRecibido?parseMoney(document.getElementById('sv-rec-monto')?.value||'0'):0;
   const pendiente=Math.max(0,precio-inicial);
   const banco=document.getElementById('sv-banco')?.value||'';
@@ -7921,7 +7922,6 @@ function confirmarVenta(nf){
     millajeVenta:parseFloat((document.getElementById('sv-millaje-venta')?.value||'0').replace(/,/g,''))||0
   };
   // Vehículo recibido
-  const tieneRecibido=document.getElementById('sv-tiene-recibido')?.checked;
   if(tieneRecibido){
     const matEl=document.getElementById('sv-rec-mat-prev');
     const recVehNombre=document.getElementById('sv-rec-vehiculo')?.value||'';
@@ -8859,7 +8859,7 @@ function guardarEditarVenta(vid){
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(document.getElementById('sv-tasa')?.value||DB.config.tasaCambio||60);
   const tieneRecibidoEdit=document.getElementById('sv-tiene-recibido')?.checked||false;
-  const montoRecibido=tieneRecibido?parseMoney(document.getElementById('sv-rec-monto')?.value||'0'):0;
+  const montoRecibido=tieneRecibidoEdit?parseMoney(document.getElementById('sv-rec-monto')?.value||'0'):0;
   const pendiente=Math.max(0,precio-inicial);
   const banco=document.getElementById('sv-banco')?.value||'';
   const cuenta=document.getElementById('sv-cuenta')?.value||'';
@@ -9198,7 +9198,7 @@ function imprimirFactura(vid){
 
   <div class="sec" style="border:1.5px solid #1a56a0;border-radius:6px;padding:8px 12px;">
     <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;color:#1a56a0;letter-spacing:.5px;margin-bottom:4px;font-family:'Outfit',Arial,sans-serif;">Observación</div>
-    <div class="obs-text">${(()=>{const txt=(v.comentario||obs||'—');const lines=txt.split('\n').filter(l=>l.trim());return lines.length>1?lines.map((l,i)=>`${i+1}.- ${escHtml(l.trim().toUpperCase())}`).join('<br>'):escHtml(txt.toUpperCase());})()}</div>
+    <div class="obs-text">${(()=>{const txt=(v.comentario||obs||'—');const lines=txt.split('\n').filter(l=>l.trim());return lines.length>1?lines.map((l)=>`• ${escHtml(l.trim().toUpperCase())}`).join('<br>'):escHtml(txt.toUpperCase());})()}</div>
   </div>
 
   <div class="fin-wrap">
@@ -9498,49 +9498,42 @@ function imprimirCotizacion(i){
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#0f172a;background:#fff}
-    .page{width:816px;min-height:1056px;margin:0 auto;padding:28px 52px;display:flex;flex-direction:column}
+    .page{width:816px;min-height:1056px;margin:0 auto;padding:36px 60px 28px 60px;display:flex;flex-direction:column}
     /* HEADER */
-    .hdr{display:flex;justify-content:center;align-items:center;margin-bottom:12px}
+    .hdr{display:flex;justify-content:center;align-items:center;margin-bottom:18px}
     /* TITLE BAR */
-    .title-bar{border-top:3px solid #1a3a8f;border-bottom:3px solid #1a3a8f;text-align:center;padding:9px 0;margin-bottom:20px}
-    .title-bar h1{font-size:26px;font-weight:900;color:#1a3a8f;letter-spacing:4px;text-transform:uppercase}
+    .title-bar{text-align:center;padding:8px 0;margin-bottom:22px}
+    .title-bar h1{font-size:22px;font-weight:900;color:#0f172a;letter-spacing:3px;text-transform:uppercase}
     /* DATE */
-    .doc-date{font-size:13px;margin-bottom:12px}
-    /* SECTION LABEL */
-    .sec-label{font-size:13px;font-weight:800;color:#1a3a8f;text-transform:uppercase;margin-bottom:6px}
-    /* INTRO BOX */
-    .intro-box{font-size:13px;line-height:1.7;color:#222;margin-bottom:14px}
-    /* VEHICLE SECTION */
-    .veh-header{background:#1a3a8f;color:#fff;font-size:12px;font-weight:800;text-transform:uppercase;padding:7px 14px;border-radius:3px;margin-bottom:10px;display:inline-block}
-    .veh-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border:1px solid #d1d5db;margin-bottom:14px}
-    .veh-cell{border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db;padding:10px 14px}
-    .veh-cell:nth-child(3n){border-right:none}
-    .veh-cell:nth-child(4),.veh-cell:nth-child(5),.veh-cell:nth-child(6){border-bottom:none}
-    .veh-cell-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:.5px;margin-bottom:4px}
-    .veh-cell-val{font-size:14px;font-weight:700;color:#0f172a;border-left:3px solid #1a3a8f;padding-left:7px}
-    /* MONTO BOX */
-    .monto-wrap{border:2px solid #16a34a;border-radius:6px;padding:12px;text-align:center;margin-bottom:14px}
-    .monto-wrap-label{font-size:12px;font-weight:800;text-transform:uppercase;color:#16a34a;letter-spacing:1px;margin-bottom:6px}
-    .monto-wrap-val{font-size:26px;font-weight:900;color:#16a34a;letter-spacing:1px}
-    /* OBSERVACIONES */
-    .obs-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:5px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#78350f;max-height:80px;overflow:hidden}
+    .doc-date{font-size:13px;font-weight:700;margin-bottom:16px}
+    /* SEÑORES */
+    .senores{font-size:13px;margin-bottom:4px}
+    .senores span{font-weight:400}
+    /* INTRO */
+    .intro{font-size:13px;line-height:1.8;color:#222;margin:18px 0 20px 0}
+    /* DATOS TABLE */
+    .datos-table{width:100%;border-collapse:collapse;margin-bottom:24px}
+    .datos-table tr td{padding:7px 10px;font-size:13px;vertical-align:top}
+    .datos-table tr td:first-child{font-weight:400;color:#0f172a;width:110px}
+    .datos-table tr td:last-child{font-weight:700;color:#0f172a}
+    /* PRECIO */
+    .precio-val{font-size:20px;font-weight:900;color:#1a3a8f}
     /* CIERRE */
-    .cierre{font-size:13px;color:#374151;line-height:1.7;margin-bottom:18px}
+    .cierre{font-size:13px;color:#374151;line-height:1.8;margin-bottom:40px}
     /* FIRMA */
-    .firma-wrap{display:flex;justify-content:center;margin-bottom:16px}
+    .firma-wrap{display:flex;justify-content:center;margin-top:auto;margin-bottom:20px}
     .firma-inner{text-align:center;min-width:220px}
-    .firma-linea{border-top:1.5px solid #0f172a;padding-top:6px;margin-top:36px}
+    .firma-linea{border-top:1.5px solid #0f172a;padding-top:6px;margin-top:50px}
     .firma-nombre{font-size:14px;font-weight:700;color:#0f172a}
     .firma-cargo{font-size:12px;color:#6b7280}
     /* FOOTER */
-    .footer-bar{margin-top:auto;border-top:3px solid #1a3a8f;padding-top:8px;text-align:center}
+    .footer-bar{border-top:4px solid #1a3a8f;padding-top:8px;text-align:center;margin-top:auto}
     .footer-bar p{font-size:11px;font-weight:700;color:#1a3a8f}
     /* PRINT */
     @media print{
       .noprint{display:none}
       body{margin:0}
       .page{padding:14mm 18mm;width:100%;min-height:auto;height:279mm;overflow:hidden}
-      .obs-box{max-height:70px;overflow:hidden}
       @page{size:letter portrait;margin:0}
     }
   </style></head><body>
@@ -9560,42 +9553,33 @@ function imprimirCotizacion(i){
     <!-- FECHA -->
     <div class="doc-date">${fmtDate(c.fecha)}</div>
 
-    <!-- DIRIGIDO A -->
-    <div class="sec-label">Dirigido A:</div>
-    <div class="intro-box">
-      Por medio de la presente, <strong>${escHtml(empresa)}</strong> se dirige a <strong>${escHtml(c.banco||'la entidad bancaria')}</strong>
-      con la finalidad de presentar la cotización del siguiente vehículo a nombre de
-      <strong>${escHtml(c.cliente||'—')}</strong>
-      ${escHtml(c.tipoDoc||'Cédula')}: <strong>${escHtml(c.documento||c.cedula||'—')}</strong>,
-      año <strong>${anioLabel}</strong>, para fines de <strong>financiamiento vehicular</strong>.
+    <!-- SEÑORES -->
+    <div class="senores">Señores: <strong>A QUIEN PUEDA INTERESAR</strong></div>
+    <div class="senores">Ciudad. <span>${escHtml(DB.config.ciudad||'SANTIAGO')}</span></div>
+
+    <!-- INTRO -->
+    <div class="intro">
+      Después de un cordial saludo, nos dirigimos a ustedes presentando la cotización del siguiente vehículo a nombre de:
     </div>
 
-    <!-- VEHÍCULO -->
-    <div class="veh-header">Vehículo a Financiar</div>
-    <div class="veh-grid">
-      <div class="veh-cell"><div class="veh-cell-label">Marca</div><div class="veh-cell-val">${escHtml(vObj?.marca||c.marca||'—')}</div></div>
-      <div class="veh-cell"><div class="veh-cell-label">Modelo</div><div class="veh-cell-val">${escHtml(vObj?.modelo||c.modelo||'—')}</div></div>
-      <div class="veh-cell"><div class="veh-cell-label">Año</div><div class="veh-cell-val">${escHtml(String(vObj?.anio||c.anio||'—'))}</div></div>
-      <div class="veh-cell"><div class="veh-cell-label">Color</div><div class="veh-cell-val">${escHtml(vObj?.color||c.color||'—')}</div></div>
-      <div class="veh-cell"><div class="veh-cell-label">Chasis / VIN</div><div class="veh-cell-val" style="font-family:monospace;font-size:12px">${escHtml(vObj?.vin||c.vin||'—')}</div></div>
-      <div class="veh-cell"><div class="veh-cell-label">Millas</div><div class="veh-cell-val">${escHtml(vObj?.millas||c.millas||'EN TRÁMITE')}</div></div>
-    </div>
-
-    <!-- MONTO -->
-    <div class="monto-wrap">
-      <div class="monto-wrap-label">Monto Cotizado para Financiamiento</div>
-      <div class="monto-wrap-val">${fV(c.precio)}</div>
-
-    </div>
-
-    <!-- OBSERVACIONES -->
-    ${c.notas?(()=>{const lines=c.notas.split('\n').filter(l=>l.trim());const rendered=lines.length>1?lines.map((l,i)=>`${i+1}.- ${escHtml(l.trim())}`).join('<br>'):escHtml(c.notas);return`<div class="obs-box">📋 <strong>Observaciones:</strong><br>${rendered}</div>`;})():''}
+    <!-- DATOS DEL VEHÍCULO -->
+    <table class="datos-table">
+      <tr><td>Nombre:</td><td>${escHtml(c.cliente||'—')}</td></tr>
+      <tr><td>${escHtml(c.tipoDoc||'RNC')}:</td><td>${escHtml(c.documento||c.cedula||'—')}</td></tr>
+      <tr><td>Tipo:</td><td>${escHtml(vObj?.tipo||c.tipo||'JEEPETA')}</td></tr>
+      <tr><td>Marca</td><td>${escHtml(vObj?.marca||c.marca||'—')}</td></tr>
+      <tr><td>Modelo:</td><td>${escHtml(vObj?.modelo||c.modelo||'—')}</td></tr>
+      <tr><td>Año:</td><td>${escHtml(String(vObj?.anio||c.anio||'—'))}</td></tr>
+      <tr><td>Color:</td><td>${escHtml(vObj?.color||c.color||'—')}</td></tr>
+      <tr><td>Chasis:</td><td style="font-family:monospace">${escHtml(vObj?.vin||c.vin||'—')}</td></tr>
+      <tr><td>Placa:</td><td>${escHtml(vObj?.placa||c.placa||'TRAMITE')}</td></tr>
+      <tr><td>Precio:</td><td><span class="precio-val">${fV(c.precio)}</span></td></tr>
+    </table>
 
     <!-- CIERRE -->
     <div class="cierre">
-      Para aclarar cualquier punto, comunicarse al Tel: <strong>${escHtml(DB.config.telefono||'—')}</strong>${DB.config.correo?` | Email: <strong>${escHtml(DB.config.correo)}</strong>`:''}.<br>
-      Quedamos a su entera disposición.<br><br>
-      Muy Atentamente.
+      Cualquier inquietud no dudes en contactarnos.<br><br>
+      Atte.
     </div>
 
     <!-- FIRMA -->
@@ -9603,14 +9587,14 @@ function imprimirCotizacion(i){
       <div class="firma-inner">
         <div class="firma-linea">
           <div class="firma-nombre">${escHtml(DB.config.responsable||empresa)}</div>
-          <div class="firma-cargo">Firma del Propietario / Responsable</div>
+          <div class="firma-cargo">${escHtml(DB.config.cargoResponsable||'Presidente')}</div>
         </div>
       </div>
     </div>
 
     <!-- FOOTER -->
     <div class="footer-bar">
-      <p>${escHtml(DB.config.direccion||'')}${DB.config.telefono?' | Tel: '+escHtml(DB.config.telefono):''}${DB.config.correo?' | Email: '+escHtml(DB.config.correo):''}</p>
+      <p>${escHtml(DB.config.direccion||'')}${DB.config.telefono?' | TELEF.: '+escHtml(DB.config.telefono):''}${DB.config.correo?' | E-mail: '+escHtml(DB.config.correo):''}</p>
     </div>
 
     <!-- BOTÓN IMPRIMIR -->

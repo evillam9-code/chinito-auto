@@ -9188,7 +9188,7 @@ function imprimirFactura(vid){
     <div class="rec-box">
       <div class="rec-titulo">Vehículo Recibido como Parte del Pago</div>
       <div class="rec-grid">
-        <div class="campo"><label>Datos Vehículo Recibido</label><span>${escHtml(rec.vehiculo.toUpperCase())}</span></div>
+        <div class="campo"><label>DATOS DEL VEHÍCULO RECIBIDO</label><span>${escHtml(rec.vehiculo.toUpperCase())}</span></div>
         <div class="campo"><label>Chasis / VIN</label><span>${escHtml((rec.vin||'—').toUpperCase())}</span></div>
         <div class="campo"><label>Placa</label><span class="placa-badge">${escHtml((rec.placa||'EN TRÁMITE').toUpperCase())}</span></div>
       </div>
@@ -9551,17 +9551,17 @@ function imprimirCotizacion(i){
     .datos-table tr td:first-child{font-weight:400;color:#0f172a;width:120px}
     .datos-table tr td:last-child{font-weight:700;color:#0f172a}
     /* PRECIO */
-    .precio-val{font-size:20px;font-weight:900;color:#1a3a8f}
+    .precio-val{font-size:18px;font-weight:900;color:#0f172a}
     /* CIERRE */
-    .cierre{font-size:13px;color:#374151;line-height:1.8;margin-bottom:40px}
+    .cierre{font-size:14px;color:#374151;line-height:1.9;margin-bottom:40px;text-align:justify}
     /* FIRMA */
-    .firma-wrap{display:flex;justify-content:center;margin-top:auto;margin-bottom:20px}
-    .firma-inner{text-align:center;min-width:220px}
+    .firma-wrap{display:flex;justify-content:flex-start;margin-top:auto;margin-bottom:20px}
+    .firma-inner{text-align:left;min-width:220px}
     .firma-linea{border-top:1.5px solid #0f172a;padding-top:6px;margin-top:50px}
     .firma-nombre{font-size:14px;font-weight:700;color:#0f172a}
     .firma-cargo{font-size:12px;color:#6b7280}
     /* FOOTER */
-    .footer-bar{border-top:4px solid #1a3a8f;padding-top:8px;text-align:center;margin-top:auto}
+    .footer-bar{border-top:5px solid #1a3a8f;padding-top:9px;text-align:center;margin-top:auto}
     .footer-bar p{font-size:11px;font-weight:700;color:#1a3a8f}
     /* PRINT */
     @media print{

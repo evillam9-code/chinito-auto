@@ -9585,7 +9585,7 @@ function imprimirCotizacion(i){
     <div class="title-bar"><h1>Cotización</h1></div>
 
     <!-- FECHA -->
-    <div class="doc-date">${fmtDate(c.fecha)}</div>
+    <div class="doc-date">${(()=>{try{const d=new Date((c.fecha||'')+'T12:00:00');const m=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];return d.getDate()+' de '+m[d.getMonth()]+' del '+d.getFullYear();}catch{return fmtDate(c.fecha);}})()}</div>
 
     <!-- SEÑORES -->
     <div class="senores">Señores: <strong>${escHtml((c.banco||'A QUIEN PUEDA INTERESAR').toUpperCase())}</strong></div>

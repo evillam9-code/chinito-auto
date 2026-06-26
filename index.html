@@ -9096,11 +9096,11 @@ function imprimirFactura(vid){
     .veh-tabla td{padding:4px 7px;border:0.5px solid #cdd8e8;font-weight:600;color:#0f172a;text-transform:uppercase;font-size:11px;font-family:'Outfit',Arial,sans-serif}
     .veh-th{background:#b8d8f8;color:#083a70;font-weight:800;font-size:11px;text-transform:uppercase}
     .placa-val{font-size:12px;font-weight:800;color:#083a70;letter-spacing:1px}
-    .rec-box{background:#f8fbff;border:1.5px solid #b8d0e8;border-radius:6px;padding:6px 10px;margin-top:2px}
-    .rec-titulo{font-size:9.5px;font-weight:900;text-transform:uppercase;color:#083a70;margin-bottom:5px;letter-spacing:.5px;font-family:'Outfit',Arial,sans-serif}
-    .rec-grid{display:grid;grid-template-columns:2fr 2fr 1fr;gap:5px}
+    .rec-box{background:#f8fbff;border:1.5px solid #b8d0e8;border-radius:6px;padding:4px 8px;margin-top:2px}
+    .rec-titulo{font-size:9.5px;font-weight:900;text-transform:uppercase;color:#083a70;margin-bottom:3px;letter-spacing:.5px;font-family:'Outfit',Arial,sans-serif}
+    .rec-grid{display:grid;grid-template-columns:2fr 2fr 1fr;gap:3px}
     .campo label{font-size:8.5px;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:1px;letter-spacing:.4px;font-family:'Outfit',Arial,sans-serif}
-    .campo span{font-size:11px;font-weight:700;color:#0f172a;display:block;padding:3px 7px;background:#fff;border-radius:3px;border-left:2px solid #083a70;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
+    .campo span{font-size:11px;font-weight:700;color:#0f172a;display:block;padding:2px 6px;background:#fff;border-radius:3px;border-left:2px solid #083a70;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
     .campo span.placa-badge{font-size:12px;font-weight:800;color:#083a70;letter-spacing:1px}
     .obs-text{font-size:9.5px;color:#374151;text-transform:uppercase;font-weight:500;font-family:'Outfit',Arial,sans-serif;line-height:1.4;max-height:60px;overflow:hidden}
     .fin-wrap{display:flex;justify-content:flex-end;margin-bottom:39px;margin-top:60px}
@@ -9184,11 +9184,11 @@ function imprimirFactura(vid){
   </div>
 
   ${rec?.vehiculo?`
-  <div class="sec">
+  <div class="sec" style="margin-bottom:10px">
     <div class="rec-box">
       <div class="rec-titulo">Vehículo Recibido como Parte del Pago</div>
       <div class="rec-grid">
-        <div class="campo"><label>Marca / Modelo</label><span>${escHtml(rec.vehiculo.toUpperCase())}</span></div>
+        <div class="campo"><label>Datos Vehículo Recibido</label><span>${escHtml(rec.vehiculo.toUpperCase())}</span></div>
         <div class="campo"><label>Chasis / VIN</label><span>${escHtml((rec.vin||'—').toUpperCase())}</span></div>
         <div class="campo"><label>Placa</label><span class="placa-badge">${escHtml((rec.placa||'EN TRÁMITE').toUpperCase())}</span></div>
       </div>
@@ -9381,18 +9381,21 @@ function nuevaCotizacion(){
     <div class="form-row c3">
       <div class="form-field"><label class="required">Nombre del Cliente / Empresa</label><input type="text" id="cot-cli"></div>
       <div class="form-field"><label class="required">Tipo Documento</label>
-        <select id="cot-tipodoc" onchange="onTipoDocChange('cot-tipodoc','cot-doc')">
+        <select id="cot-tipodoc" onchange="onTipoDocChange('cot-tipodoc','cot-doc');actualizarLabelDoc(this.value,'cot-doc-lbl')">
           <option value="Cédula">Cédula</option><option value="RNC">RNC</option><option value="Pasaporte">Pasaporte</option>
         </select>
       </div>
-      <div class="form-field"><label class="required">Número Documento</label>
+      <div class="form-field"><label class="required" id="cot-doc-lbl">Documento</label>
         <input type="text" id="cot-doc" maxlength="13" placeholder="000-0000000-0" oninput="fmtDocInput('cot-tipodoc','cot-doc')">
       </div>
     </div>
     <div class="form-row c3">
       <div class="form-field"><label>Teléfono</label><input type="text" id="cot-tel" maxlength="12" placeholder="000-000-0000" oninput="fmtTelInput(this)"></div>
-      <div class="form-field"><label>Entidad Bancaria</label>
-        <select id="cot-banco" class="no-upper"><option value="A QUIEN PUEDA INTERESAR">A QUIEN PUEDA INTERESAR</option>${bancos.map(b=>`<option>${escHtml(b)}</option>`).join('')}</select>
+      <div class="form-field"><label>Banco / Entidad</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="cot-banco" class="no-upper" style="flex:1"><option value="A QUIEN PUEDA INTERESAR">A QUIEN PUEDA INTERESAR</option>${bancos.map(b=>`<option>${escHtml(b)}</option>`).join('')}</select>
+          <button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:7px 10px" title="Agregar banco" onclick="agregarBancoCotizacion()">➕</button>
+        </div>
       </div>
       <div class="form-field"><label>Fecha</label><input type="date" id="cot-fecha" value="${today()}"></div>
     </div>
@@ -9461,14 +9464,14 @@ function editarCotizacion(i){
     <input type="hidden" id="cot-veh" value="${c.vehiculoId||''}">
     <div class="form-row c3">
       <div class="form-field"><label>Cliente / Empresa</label><input type="text" id="cot-cli" value="${escHtml(c.cliente||'')}"></div>
-      <div class="form-field"><label>Tipo Doc</label>
-        <select id="cot-tipodoc"><option value="Cédula" ${(c.tipoDoc||'Cédula')==='Cédula'?'selected':''}>Cédula</option><option value="RNC" ${c.tipoDoc==='RNC'?'selected':''}>RNC</option><option value="Pasaporte" ${c.tipoDoc==='Pasaporte'?'selected':''}>Pasaporte</option></select>
+      <div class="form-field"><label>Tipo Documento</label>
+        <select id="cot-tipodoc" onchange="onTipoDocChange('cot-tipodoc','cot-doc');actualizarLabelDoc(this.value,'cot-doc-lbl')"><option value="Cédula" ${(c.tipoDoc||'Cédula')==='Cédula'?'selected':''}>Cédula</option><option value="RNC" ${c.tipoDoc==='RNC'?'selected':''}>RNC</option><option value="Pasaporte" ${c.tipoDoc==='Pasaporte'?'selected':''}>Pasaporte</option></select>
       </div>
-      <div class="form-field"><label>Documento</label><input type="text" id="cot-doc" value="${escHtml(c.documento||c.cedula||'')}" maxlength="13" oninput="fmtDocInput('cot-tipodoc','cot-doc')"></div>
+      <div class="form-field"><label id="cot-doc-lbl">${c.tipoDoc||'Cédula'}</label><input type="text" id="cot-doc" value="${escHtml(c.documento||c.cedula||'')}" maxlength="13" oninput="fmtDocInput('cot-tipodoc','cot-doc')"></div>
     </div>
     <div class="form-row c3">
       <div class="form-field"><label>Teléfono</label><input type="text" id="cot-tel" value="${escHtml(c.telefono||'')}" maxlength="12" oninput="fmtTelInput(this)"></div>
-      <div class="form-field"><label>Banco</label><select id="cot-banco" class="no-upper"><option value="A QUIEN PUEDA INTERESAR" ${'A QUIEN PUEDA INTERESAR'===c.banco?'selected':''}>A QUIEN PUEDA INTERESAR</option>${bancos.map(b=>`<option ${b===c.banco?'selected':''}>${escHtml(b)}</option>`).join('')}</select></div>
+      <div class="form-field"><label>Banco / Entidad</label><div style="display:flex;gap:6px;align-items:center"><select id="cot-banco" class="no-upper" style="flex:1"><option value="A QUIEN PUEDA INTERESAR" ${'A QUIEN PUEDA INTERESAR'===c.banco?'selected':''}>A QUIEN PUEDA INTERESAR</option>${bancos.map(b=>`<option ${b===c.banco?'selected':''}>${escHtml(b)}</option>`).join('')}</select><button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:7px 10px" title="Agregar banco" onclick="agregarBancoCotizacion()">&#10133;</button></div></div>
       <div class="form-field"><label>Fecha</label><input type="date" id="cot-fecha" value="${c.fecha||today()}"></div>
     </div>
     <div class="form-row c3">
@@ -9479,6 +9482,38 @@ function editarCotizacion(i){
     <div class="form-field"><label>Notas</label><textarea id="cot-notas" rows="4">${escHtml(c.notas||'')}</textarea></div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
      <button class="btn btn-primary" onclick="guardarCotizacion(${i})">💾 Actualizar</button>`);
+}
+function actualizarLabelDoc(tipo,lblId){
+  const el=document.getElementById(lblId);
+  if(!el)return;
+  el.textContent=tipo||'Cédula';
+}
+function agregarBancoCotizacion(){
+  openModal('Agregar Banco / Entidad',
+    '<div class="form-field"><label class="required">Nombre del Banco o Entidad</label><input type="text" id="nuevo-banco-input" placeholder="Ej: Banco BHD León" style="text-transform:uppercase"></div>',
+    '<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="confirmarNuevoBanco()">✔ Agregar</button>'
+  );
+  setTimeout(()=>{const i=document.getElementById('nuevo-banco-input');if(i)i.focus();},200);
+}
+function confirmarNuevoBanco(){
+  const inp=document.getElementById('nuevo-banco-input');
+  if(!inp)return;
+  const nombre=inp.value.trim().toUpperCase();
+  if(!nombre){toast('Escribe el nombre del banco','error');return;}
+  if(!DB.config.bancos)DB.config.bancos=[];
+  if(DB.config.bancos.includes(nombre)){toast('Ese banco ya existe','warning');return;}
+  DB.config.bancos.push(nombre);
+  sDB('config');
+  // Agregar al select activo
+  const sel=document.getElementById('cot-banco');
+  if(sel){
+    const opt=document.createElement('option');
+    opt.value=nombre;opt.text=nombre;opt.selected=true;
+    sel.appendChild(opt);
+  }
+  closeModal();
+  toast('Banco agregado ✓','success');
 }
 function imprimirCotizacion(i){
   const c=DB.cotizaciones[i];if(!c)return;
@@ -9496,7 +9531,7 @@ function imprimirCotizacion(i){
   <title>Cotización — ${escHtml(c.cliente||'')} — ${escHtml(c.vehiculo||'')}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#0f172a;background:#fff}
+    body{font-family:'Calibri',Calibri,Arial,sans-serif;font-size:14px;color:#0f172a;background:#fff;text-align:justify}
     .page{width:816px;min-height:1056px;margin:0 auto;padding:36px 60px 28px 60px;display:flex;flex-direction:column}
     /* HEADER */
     .hdr{display:flex;justify-content:center;align-items:center;margin-bottom:18px}
@@ -9504,16 +9539,16 @@ function imprimirCotizacion(i){
     .title-bar{text-align:center;padding:8px 0;margin-bottom:22px}
     .title-bar h1{font-size:22px;font-weight:900;color:#0f172a;letter-spacing:3px;text-transform:uppercase}
     /* DATE */
-    .doc-date{font-size:13px;font-weight:700;margin-bottom:16px}
+    .doc-date{font-size:14px;font-weight:700;margin-bottom:16px}
     /* SEÑORES */
-    .senores{font-size:13px;margin-bottom:4px}
+    .senores{font-size:14px;margin-bottom:4px}
     .senores span{font-weight:400}
     /* INTRO */
-    .intro{font-size:13px;line-height:1.8;color:#222;margin:18px 0 20px 0}
+    .intro{font-size:14px;line-height:1.8;color:#222;margin:18px 0 20px 0;text-align:justify}
     /* DATOS TABLE */
     .datos-table{width:100%;border-collapse:collapse;margin-bottom:24px}
-    .datos-table tr td{padding:7px 10px;font-size:13px;vertical-align:top}
-    .datos-table tr td:first-child{font-weight:400;color:#0f172a;width:110px}
+    .datos-table tr td{padding:1px 10px;font-size:14px;vertical-align:top;text-align:left}
+    .datos-table tr td:first-child{font-weight:400;color:#0f172a;width:120px}
     .datos-table tr td:last-child{font-weight:700;color:#0f172a}
     /* PRECIO */
     .precio-val{font-size:20px;font-weight:900;color:#1a3a8f}
@@ -9541,7 +9576,7 @@ function imprimirCotizacion(i){
     <!-- HEADER: Logo centrado -->
     <div class="hdr">
       ${logo
-        ?`<img src="${logo}" style="max-height:130px;max-width:340px;object-fit:contain">`
+        ?`<img src="${logo}" style="max-height:180px;max-width:480px;object-fit:contain">`
         :`<div style="font-size:26px;font-weight:900;color:#1a3a8f;letter-spacing:2px">${escHtml(empresa)}</div>`
       }
     </div>

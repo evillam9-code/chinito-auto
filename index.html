@@ -2804,19 +2804,19 @@ function guardarVehiculo(id){
   const fotoEl=document.getElementById('v-foto-prev');
   const carfaxEl=document.getElementById('v-carfax-prev');
   const obj={
-    id:id||uid(),codigo:cod,propietario:prop,marca,modelo,
-    tipo:document.getElementById('v-tipo').value,
-    anio:parseInt(anio),color:document.getElementById('v-color').value,
+    id:id||uid(),codigo:cod.toUpperCase(),propietario:prop.toUpperCase(),marca:marca.toUpperCase(),modelo:modelo.toUpperCase(),
+    tipo:document.getElementById('v-tipo').value.toUpperCase(),
+    anio:parseInt(anio),color:document.getElementById('v-color').value.toUpperCase(),
     millas:parseFloat(document.getElementById('v-millas').value||0),
     traccion:document.getElementById('v-traccion')?.value||'',
     suplidor:document.getElementById('v-suplidor')?.value||'',
     status:document.getElementById('v-status').value,
     tipoCompra:document.getElementById('v-tipo-compra').value,
     fecha:document.getElementById('v-fecha').value,
-    vin,placa:document.getElementById('v-placa').value,
+    vin:vin.toUpperCase(),placa:(document.getElementById('v-placa').value||'').toUpperCase(),
     foto:fotoEl?.style.display!=='none'&&fotoEl?.src?fotoEl.src:(id?DB.vehiculos.find(x=>x.id===id)?.foto||'':''),
     carfax:carfaxEl?.style.display!=='none'&&carfaxEl?.src?carfaxEl.src:(id?DB.vehiculos.find(x=>x.id===id)?.carfax||'':''),
-    notas:document.getElementById('v-notas').value
+    notas:document.getElementById('v-notas').value.toUpperCase()
   };
   if(id){
     const i=DB.vehiculos.findIndex(x=>x.id===id);
@@ -8423,7 +8423,7 @@ function confirmarVenta(nf){
   const monedaVenta=document.getElementById('sv-moneda')?.value||'RD$';
   const tasa=parseFloat(DB.config.tasaCambio||60);
   // Vehículo recibido: leer monto ANTES de calcular pendiente
-  const tieneRecibidoCheck=document.getElementById('sv-tiene-recibido')?.checked||false;
+  const tieneRecibido=document.getElementById('sv-tiene-recibido')?.checked||false;
   const montoRecibido=tieneRecibido?parseMoney(document.getElementById('sv-rec-monto')?.value||'0'):0;
   const pendiente=Math.max(0,precio-inicial);
   const banco=document.getElementById('sv-banco')?.value||'';
@@ -9531,38 +9531,38 @@ function imprimirCotizacion(i){
   <title>Cotización — ${escHtml(c.cliente||'')} — ${escHtml(c.vehiculo||'')}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Calibri',Calibri,Arial,sans-serif;font-size:14px;color:#0f172a;background:#fff;text-align:justify}
+    body{font-family:'Calibri',Calibri,Arial,sans-serif;font-size:17px;color:#0f172a;background:#fff;text-align:justify}
     .page{width:816px;min-height:1056px;margin:0 auto;padding:36px 60px 28px 60px;display:flex;flex-direction:column}
     /* HEADER */
     .hdr{display:flex;justify-content:center;align-items:center;margin-bottom:18px}
     /* TITLE BAR */
     .title-bar{text-align:center;padding:8px 0;margin-bottom:22px}
-    .title-bar h1{font-size:22px;font-weight:900;color:#0f172a;letter-spacing:3px;text-transform:uppercase}
+    .title-bar h1{font-size:25px;font-weight:900;color:#0f172a;letter-spacing:3px;text-transform:uppercase}
     /* DATE */
-    .doc-date{font-size:14px;font-weight:700;margin-bottom:16px}
+    .doc-date{font-size:17px;font-weight:700;margin-bottom:28px}
     /* SEÑORES */
-    .senores{font-size:14px;margin-bottom:4px}
+    .senores{font-size:17px;margin-bottom:4px}
     .senores span{font-weight:400}
     /* INTRO */
-    .intro{font-size:14px;line-height:1.8;color:#222;margin:18px 0 20px 0;text-align:justify}
+    .intro{font-size:17px;line-height:1.8;color:#222;margin:18px 0 20px 0;text-align:justify}
     /* DATOS TABLE */
     .datos-table{width:100%;border-collapse:collapse;margin-bottom:24px}
-    .datos-table tr td{padding:1px 10px;font-size:14px;vertical-align:top;text-align:left}
+    .datos-table tr td{padding:1px 10px;font-size:17px;vertical-align:top;text-align:left}
     .datos-table tr td:first-child{font-weight:400;color:#0f172a;width:120px}
     .datos-table tr td:last-child{font-weight:700;color:#0f172a}
     /* PRECIO */
-    .precio-val{font-size:18px;font-weight:900;color:#0f172a}
+    .precio-val{font-size:21px;font-weight:900;color:#0f172a}
     /* CIERRE */
-    .cierre{font-size:14px;color:#374151;line-height:1.9;margin-bottom:40px;text-align:justify}
+    .cierre{font-size:17px;color:#374151;line-height:1.9;margin-bottom:40px;text-align:justify}
     /* FIRMA */
-    .firma-wrap{display:flex;justify-content:flex-start;margin-top:auto;margin-bottom:20px}
+    .firma-wrap{display:flex;justify-content:flex-start;margin-top:auto;margin-bottom:56px}
     .firma-inner{text-align:left;min-width:220px}
     .firma-linea{border-top:1.5px solid #0f172a;padding-top:6px;margin-top:50px}
-    .firma-nombre{font-size:14px;font-weight:700;color:#0f172a}
-    .firma-cargo{font-size:12px;color:#6b7280}
+    .firma-nombre{font-size:17px;font-weight:700;color:#0f172a}
+    .firma-cargo{font-size:15px;color:#6b7280}
     /* FOOTER */
     .footer-bar{border-top:5px solid #1a3a8f;padding-top:9px;text-align:center;margin-top:auto}
-    .footer-bar p{font-size:11px;font-weight:700;color:#1a3a8f}
+    .footer-bar p{font-size:14px;font-weight:700;color:#1a3a8f;line-height:1.7}
     /* PRINT */
     @media print{
       .noprint{display:none}
@@ -9577,12 +9577,12 @@ function imprimirCotizacion(i){
     <div class="hdr">
       ${logo
         ?`<img src="${logo}" style="max-height:180px;max-width:480px;object-fit:contain">`
-        :`<div style="font-size:26px;font-weight:900;color:#1a3a8f;letter-spacing:2px">${escHtml(empresa)}</div>`
+        :`<div style="font-size:29px;font-weight:900;color:#1a3a8f;letter-spacing:2px">${escHtml(empresa)}</div>`
       }
     </div>
 
     <!-- TÍTULO -->
-    <div class="title-bar"><h1>Cotización</h1></div>
+    <div class="title-bar"><h1><strong>Cotización</strong></h1></div>
 
     <!-- FECHA -->
     <div class="doc-date">${(()=>{try{const d=new Date((c.fecha||'')+'T12:00:00');const m=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];return d.getDate()+' de '+m[d.getMonth()]+' del '+d.getFullYear();}catch{return fmtDate(c.fecha);}})()}</div>
@@ -9628,7 +9628,8 @@ function imprimirCotizacion(i){
 
     <!-- FOOTER -->
     <div class="footer-bar">
-      <p>${escHtml(DB.config.direccion||'')}${DB.config.telefono?' | TELEF.: '+escHtml(DB.config.telefono):''}${DB.config.correo?' | E-mail: '+escHtml(DB.config.correo):''}</p>
+      <p>Autopista Duarte, km. 9 1/2, Puñal, Santiago. República Dominicana</p>
+      <p>TELEF.: 809-570-7272. E-mail: CHINITOAUTOIMPORT@HOTMAIL.COM</p>
     </div>
 
     <!-- BOTÓN IMPRIMIR -->
@@ -10509,7 +10510,9 @@ function confirmarPagoCXP(i){
   // Guardar historial de pagos
   if(!DB.gastosVehiculos[i].pagos)DB.gastosVehiculos[i].pagos=[];
   DB.gastosVehiculos[i].pagos.push({id:uid(),fecha:fechaPago,monto,cuenta:cuentaPago,nota:notaPago,saldado});
-  sDB('gastosVehiculos');
+  const _bancoCXP=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===cuentaPago))?.banco||'';
+  DB.caja.push({id:uid(),fecha:fechaPago,tipo:'SALIDA',categoria:'Pago CxP',descripcion:`Pago CxP: ${DB.gastosVehiculos[i].suplidor||'—'} — ${DB.gastosVehiculos[i].tipo||'—'}`,monto,banco:_bancoCXP,cuenta:cuentaPago,referencia:DB.gastosVehiculos[i].descripcion||'',responsable:currentUser?.nombre||''});
+  sDB('gastosVehiculos');sDB('caja');
   closeModal();
   // Generar recibo de pago
   imprimirReciboPagoCXP(DB.gastosVehiculos[i],{fecha:fechaPago,monto,cuenta:cuentaPago,nota:notaPago,saldado});
@@ -12362,6 +12365,11 @@ function guardarFacturaExterna(nFact,imprimir=true){
   if(!DB.facturasExternas)DB.facturasExternas=[];
   DB.facturasExternas.push(f);
   sDB('facturasExternas');
+  if(abono>0){
+    const _bancoFE=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===f.cuenta))?.banco||f.banco||'';
+    DB.caja.push({id:uid(),fecha:f.fecha,tipo:'ENTRADA',categoria:'Factura Externa',descripcion:`Factura Externa ${f.numero}: ${f.cliente||f.vehiculo}`,monto:abono,banco:_bancoFE,cuenta:f.cuenta||'',referencia:f.numero,responsable:currentUser?.nombre||''});
+    sDB('caja');
+  }
   closeModal();
   if(imprimir)imprimirFacturaExterna(f.id,true);
   toast('Factura externa guardada ✓','success');
@@ -12460,11 +12468,18 @@ function actualizarFacturaExterna(i,imprimir=false){
   f.clienteCiudad=document.getElementById('fe-cli-ciudad')?.value.trim()||'';
   f.banco=document.getElementById('fe-banco')?.value||'';
   f.cuenta=document.getElementById('fe-cuenta')?.value||'';
+  const _abonoAnterior=parseFloat(f.abono||0);
   f.monto=monto;f.abono=abono;f.pendiente=Math.max(0,monto-abono);
   f.moneda=document.getElementById('fe-moneda').value;
   f.fecha=document.getElementById('fe-fecha').value;
   f.obs=document.getElementById('fe-obs').value;
   sDB('facturasExternas');
+  const _difAbono=abono-_abonoAnterior;
+  if(_difAbono>0){
+    const _bancoFEU=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===f.cuenta))?.banco||f.banco||'';
+    DB.caja.push({id:uid(),fecha:f.fecha,tipo:'ENTRADA',categoria:'Factura Externa',descripcion:`Cobro Factura Externa ${f.numero}: ${f.cliente||f.vehiculo}`,monto:_difAbono,banco:_bancoFEU,cuenta:f.cuenta||'',referencia:f.numero,responsable:currentUser?.nombre||''});
+    sDB('caja');
+  }
   closeModal();
   if(imprimir)imprimirFacturaExterna(f.id,true);
   toast('Factura actualizada ✓','success');

@@ -8465,7 +8465,6 @@ function confirmarVenta(nf){
     millajeVenta:parseFloat((document.getElementById('sv-millaje-venta')?.value||'0').replace(/,/g,''))||0
   };
   // Vehículo recibido
-  const tieneRecibido=tieneRecibidoCheck;
   if(tieneRecibido){
     const matEl=document.getElementById('sv-rec-mat-prev');
     const recVehNombre=document.getElementById('sv-rec-vehiculo')?.value||'';

@@ -2808,7 +2808,7 @@ function guardarVehiculo(id){
     tipo:document.getElementById('v-tipo').value.toUpperCase(),
     anio:parseInt(anio),color:document.getElementById('v-color').value.toUpperCase(),
     millas:parseFloat(document.getElementById('v-millas').value||0),
-    traccion:document.getElementById('v-traccion')?.value||'',
+    traccion:(document.getElementById('v-traccion')?.value||'').toUpperCase(),
     suplidor:document.getElementById('v-suplidor')?.value||'',
     status:document.getElementById('v-status').value,
     tipoCompra:document.getElementById('v-tipo-compra').value,
@@ -6038,12 +6038,13 @@ function _iniciarPresenciaGlobal(){
   _pingPresencia();
   if(window._presenciaGlobalInterval)clearInterval(window._presenciaGlobalInterval);
   window._presenciaGlobalInterval=setInterval(()=>{
-    if(!currentUser){clearInterval(window._presenciaGlobalInterval);return;}
-    _sincPresencia();
-    _pingPresencia();
-    // Refrescar usuarios y chat si están activos para mostrar estado actualizado
-    const pU=document.getElementById('page-usuarios');
-    if(pU&&pU.classList.contains('active')){clearTimeout(window._presenciaRefreshTimer);window._presenciaRefreshTimer=setTimeout(_actualizarBadgesOnlineUsuarios,200);}
+    try{
+      if(!currentUser){clearInterval(window._presenciaGlobalInterval);return;}
+      _sincPresencia();
+      _pingPresencia();
+      const pU=document.getElementById('page-usuarios');
+      if(pU&&pU.classList.contains('active')){clearTimeout(window._presenciaRefreshTimer);window._presenciaRefreshTimer=setTimeout(_actualizarBadgesOnlineUsuarios,200);}
+    }catch(e){console.warn('Presencia error:',e);}
   },8000);
   window.addEventListener('beforeunload',()=>{
     if(currentUser){
@@ -6057,7 +6058,7 @@ function _chatIniciarPresencia(){
   // Presencia ya manejada por _iniciarPresenciaGlobal — solo actualizamos badge
   if(!currentUser)return;
   if(_presenceInterval)clearInterval(_presenceInterval);
-  _presenceInterval=setInterval(()=>{if(!currentUser)return;_chatActualizarBadge();},20000);
+  _presenceInterval=setInterval(()=>{try{if(!currentUser)return;_chatActualizarBadge();}catch(e){console.warn('Presence badge error:',e);}},20000);
 }
 
 // ══ GUARDAR POR SECCIÓN ══
@@ -9556,11 +9557,11 @@ function imprimirCotizacion(i){
     /* FIRMA */
     .firma-wrap{display:flex;justify-content:flex-start;margin-top:auto;margin-bottom:56px}
     .firma-inner{text-align:left;min-width:220px}
-    .firma-linea{border-top:1.5px solid #0f172a;padding-top:6px;margin-top:50px}
+    .firma-linea{border-top:1.5px solid #0f172a;padding-top:6px;margin-top:34px}
     .firma-nombre{font-size:17px;font-weight:700;color:#0f172a}
     .firma-cargo{font-size:15px;color:#6b7280}
     /* FOOTER */
-    .footer-bar{border-top:5px solid #1a3a8f;padding-top:9px;text-align:center;margin-top:auto}
+    .footer-bar{border-top:5px solid #1a3a8f;padding-top:3px;text-align:center;margin-top:auto}
     .footer-bar p{font-size:14px;font-weight:700;color:#1a3a8f;line-height:1.7}
     /* PRINT */
     @media print{
@@ -9575,7 +9576,7 @@ function imprimirCotizacion(i){
     <!-- HEADER: Logo centrado -->
     <div class="hdr">
       ${logo
-        ?`<img src="${logo}" style="max-height:180px;max-width:480px;object-fit:contain">`
+        ?`<img src="${logo}" style="max-height:140px;max-width:480px;object-fit:contain">`
         :`<div style="font-size:29px;font-weight:900;color:#1a3a8f;letter-spacing:2px">${escHtml(empresa)}</div>`
       }
     </div>
@@ -9707,8 +9708,9 @@ function guardarCliente(idx){
   if(!nombre){toast('El nombre es requerido','error');return;}
 
   // Validar duplicado por nombre
-  const nombreDup=DB.clientes.find((c,i)=>c.nombre.toLowerCase()===nombre.toLowerCase()&&i!==idx);
-  if(nombreDup){toast('Ya existe un cliente con ese nombre','error');return;}
+  const _nomN=nombre.trim().toLowerCase().replace(/\s+/g,' ');
+  const nombreDup=DB.clientes.find((c,i)=>c.nombre.trim().toLowerCase().replace(/\s+/g,' ')===_nomN&&(idx===undefined?true:i!==idx));
+  if(nombreDup){toast('Ya existe un cliente con ese nombre: '+nombreDup.nombre,'error');return;}
   // Validar duplicado por documento
   if(docVal){
     const docDup=DB.clientes.find((c,i)=>c.documento&&c.documento.replace(/-/g,'')===docVal.replace(/-/g,'')&&i!==idx);
@@ -9873,8 +9875,9 @@ function guardarSuplidor(idx){
   const tel=document.getElementById('s-tel').value.trim();
   if(!empresa||!propietario||!tel){toast('Empresa, propietario y teléfono son requeridos','error');return;}
   // Validar duplicado por nombre de empresa
-  const empDup=DB.suplidores.find((s,i)=>(s.empresa||s.nombre||'').toLowerCase()===empresa.toLowerCase()&&(idx===undefined?true:i!==idx));
-  if(empDup){toast('Ya existe un suplidor con ese nombre de empresa','error');return;}
+  const _empN=empresa.trim().toLowerCase().replace(/\s+/g,' ');
+  const empDup=DB.suplidores.find((s,i)=>(s.empresa||s.nombre||'').trim().toLowerCase().replace(/\s+/g,' ')===_empN&&(idx===undefined?true:i!==idx));
+  if(empDup){toast('Ya existe un suplidor con ese nombre: '+( empDup.empresa||empDup.nombre),'error');return;}
   // Validar duplicado por documento
   const rncVal=document.getElementById('s-rnc').value.trim();
   if(rncVal){
@@ -13627,7 +13630,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('input:not([type=password]),select,textarea').forEach(el=>{el.setAttribute('autocomplete','off');});
   const _acObs=new MutationObserver(ms=>{ms.forEach(m=>{m.addedNodes.forEach(n=>{if(n.querySelectorAll){n.querySelectorAll('input:not([type=password]),select,textarea').forEach(el=>{if(!el.getAttribute('autocomplete'))el.setAttribute('autocomplete','off');});}});});});
   _acObs.observe(document.body,{childList:true,subtree:true});
-  setInterval(()=>{if(currentUser)_chatActualizarBadge();},10000);
+  setInterval(()=>{try{if(currentUser)_chatActualizarBadge();}catch(e){console.warn('Badge error:',e);}},10000);
   if(DB.config?.colores)aplicarColoresSistema();
 });
 

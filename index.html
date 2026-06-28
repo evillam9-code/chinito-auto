@@ -655,6 +655,7 @@ function doLogin(){
     actualizarLogoSidebar();
     logBit('Sesión','Inició sesión','—');
     showPage('dashboard');
+    setTimeout(_autoMigrarCaja,3000);
     setTimeout(checkAlerts,1500);
     _iniciarPresenciaGlobal();
     setTimeout(_verificarBackupAdmin,2500);
@@ -2703,7 +2704,7 @@ function formVehiculo(v){
         <div style="display:flex;gap:6px">
           <select id="v-prop" style="flex:1">
             <option value="">-- Seleccionar --</option>
-            ${(DB.config.propietarios||[]).map(p=>`<option value="${escHtml(p)}" ${p===v?.propietario?'selected':''}>${escHtml(p)}</option>`).join('')}
+            ${(DB.config.propietarios||[]).map(p=>`<option value="${escHtml(p)}" ${p.toUpperCase()===(v?.propietario||'').toUpperCase()?'selected':''}>${escHtml(p)}</option>`).join('')}
           </select>
           <button class="btn btn-secondary btn-sm" type="button" onclick="agregarPropietarioRapido()">➕</button>
         </div>
@@ -2712,29 +2713,29 @@ function formVehiculo(v){
     <div class="form-row c3">
       <div class="form-field"><label class="required">Marca</label>
         <div style="display:flex;gap:4px">
-          <select id="v-marca" style="flex:1"><option value="">Seleccionar...</option>${[...MARCAS,...(DB.config.marcasExtra||[])].map(m=>`<option ${m===v?.marca?'selected':''}>${escHtml(m)}</option>`).join('')}</select>
+          <select id="v-marca" style="flex:1"><option value="">Seleccionar...</option>${[...MARCAS,...(DB.config.marcasExtra||[])].map(m=>`<option ${m.toUpperCase()===(v?.marca||'').toUpperCase()?'selected':''}>${escHtml(m)}</option>`).join('')}</select>
           <button type="button" class="btn btn-secondary btn-sm" onclick="agregarMarcaRapida()" title="Agregar marca nueva" style="white-space:nowrap">➕</button>
         </div>
       </div>
       <div class="form-field"><label class="required">Modelo</label><input type="text" id="v-modelo" value="${escHtml(v?.modelo||'')}" placeholder="Modelo"></div>
-      <div class="form-field"><label>Tipo</label><div style="display:flex;gap:4px"><select id="v-tipo" style="flex:1">${[...TIPOS,...(DB.config.tiposExtra||[])].map(t=>`<option ${t===v?.tipo?'selected':''}>${escHtml(t)}</option>`).join('')}</select><button type="button" class="btn btn-secondary btn-sm" onclick="agregarTipoRapido()" title="Agregar tipo nuevo">➕</button></div></div>
+      <div class="form-field"><label>Tipo</label><div style="display:flex;gap:4px"><select id="v-tipo" style="flex:1">${[...TIPOS,...(DB.config.tiposExtra||[])].map(t=>`<option ${t.toUpperCase()===(v?.tipo||'').toUpperCase()?'selected':''}>${escHtml(t)}</option>`).join('')}</select><button type="button" class="btn btn-secondary btn-sm" onclick="agregarTipoRapido()" title="Agregar tipo nuevo">➕</button></div></div>
     </div>
     <div class="form-row c3">
       <div class="form-field"><label class="required">Año</label><input type="number" id="v-anio" value="${v?.anio||currentYear()}" min="1990" max="${currentYear()+2}"></div>
-      <div class="form-field"><label>Color</label><div style="display:flex;gap:4px"><select id="v-color" style="flex:1"><option value="">Seleccionar...</option>${[...COLORES,...(DB.config.coloresExtra||[])].map(c=>`<option ${c===v?.color?'selected':''}>${escHtml(c)}</option>`).join('')}</select><button type="button" class="btn btn-secondary btn-sm" onclick="agregarColorRapido()" title="Agregar color nuevo">➕</button></div></div>
+      <div class="form-field"><label>Color</label><div style="display:flex;gap:4px"><select id="v-color" style="flex:1"><option value="">Seleccionar...</option>${[...COLORES,...(DB.config.coloresExtra||[])].map(c=>`<option ${c.toUpperCase()===(v?.color||'').toUpperCase()?'selected':''}>${escHtml(c)}</option>`).join('')}</select><button type="button" class="btn btn-secondary btn-sm" onclick="agregarColorRapido()" title="Agregar color nuevo">➕</button></div></div>
       <div class="form-field"><label>Millaje</label><input type="number" id="v-millas" value="${v?.millas||0}"></div>
     </div>
     <div class="form-row c2">
       <div class="form-field"><label>Tracción</label>
         <select id="v-traccion">
           <option value="">Seleccionar...</option>
-          ${['4x4','4x2','AWD','FWD','RWD'].map(t=>`<option ${t===v?.traccion?'selected':''}>${t}</option>`).join('')}
+          ${['4X4','4X2','AWD','FWD','RWD'].map(t=>`<option ${t.toUpperCase()===(v?.traccion||'').toUpperCase()?'selected':''}>${t}</option>`).join('')}
         </select>
       </div>
       <div class="form-field"><label>Combustible</label>
         <select id="v-combustible">
           <option value="">Seleccionar...</option>
-          ${['Gasolina','Diesel','Eléctrico','Híbrido'].map(c=>`<option ${c===v?.combustible?'selected':''}>${c}</option>`).join('')}
+          ${['GASOLINA','DIESEL','ELÉCTRICO','HÍBRIDO'].map(c=>`<option ${c.toUpperCase()===(v?.combustible||'').toUpperCase()?'selected':''}>${c}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -2743,7 +2744,7 @@ function formVehiculo(v){
         (v&&(v.status==='TRÁNSITO'||v.status==='VENDIDO'))
           ? `<input type="text" id="v-status" value="${v.status}" disabled style="background:#f1f5f9;color:#64748b;font-weight:700">
              <div style="font-size:11px;color:var(--gray);margin-top:3px">Este estado lo controla el módulo de Ventas y no se puede editar aquí.</div>`
-          : `<select id="v-status">${['EN EEUU','ADUANA','ACTIVO'].map(s=>`<option ${s===v?.status?'selected':''}>${s}</option>`).join('')}</select>`
+          : `<select id="v-status">${['EN EEUU','ADUANA','ACTIVO'].map(s=>`<option ${s.toUpperCase()===(v?.status||'').toUpperCase()?'selected':''}>${s}</option>`).join('')}</select>`
       }</div>
       <div class="form-field"><label>Tipo de Compra</label><select id="v-tipo-compra">${[['IMPORTACION','Importación'],['LOCAL','Compra Local'],['RECIBIDO','Recibido']].map(([val,lbl])=>`<option value="${val}" ${val===v?.tipoCompra?'selected':''}>${lbl}</option>`).join('')}</select></div>
       <div class="form-field"><label>Fecha de Compra</label><input type="date" id="v-fecha" value="${v?.fecha||today()}"></div>
@@ -2772,7 +2773,7 @@ function formVehiculo(v){
       <div class="form-field"><label>Compañía Importadora</label>
         <select id="v-suplidor">
           <option value="">-- Sin compañía --</option>
-          ${DB.suplidores.filter(s=>s.tipoSuplidor==='importadora').map(s=>`<option value="${escHtml(s.empresa||s.nombre||'')}" ${(s.empresa||s.nombre||'')===v?.suplidor?'selected':''}>${escHtml(s.empresa||s.nombre||'')}${s.propietario?' — '+s.propietario:''}</option>`).join('')}
+          ${DB.suplidores.filter(s=>s.tipoSuplidor==='importadora').map(s=>`<option value="${escHtml(s.empresa||s.nombre||'')}" ${(s.empresa||s.nombre||'').toUpperCase()===(v?.suplidor||'').toUpperCase()?'selected':''}>${escHtml(s.empresa||s.nombre||'')}${s.propietario?' — '+s.propietario:''}</option>`).join('')}
         </select>
       </div>
       <div class="form-field"><label>Notas</label><textarea id="v-notas" rows="1" placeholder="Notas adicionales...">${escHtml(v?.notas||'')}</textarea></div>
@@ -3025,6 +3026,55 @@ function imprimirGastosVehiculo(vid){
   _generarPDFGastosVeh(gastos,tasa,'',vid,true);
 }
 
+
+// ══ MIGRACIÓN HISTÓRICA DE CAJA (AUTOMÁTICA) ══
+function _autoMigrarCaja(){
+  try{
+    if(!DB||!DB.caja||!DB.gastosVehiculos)return;
+    // Flag para no correr dos veces en la misma sesión
+    if(window._cajaMigrada)return;
+    window._cajaMigrada=true;
+    let agregados=0;
+
+    // ── Gastos de Vehículo ──
+    const cajaCats=new Set(DB.caja.filter(c=>c.tipo==='SALIDA'&&c.categoria==='Gasto de Vehículo').map(c=>c.referencia_gasto||'').filter(Boolean));
+    (DB.gastosVehiculos||[]).forEach(g=>{
+      if(cajaCats.has(g.id))return;
+      const veh=DB.vehiculos.find(v=>v.id===g.vehiculoId);
+      const cod=veh?.codigo||g.vehiculo||g.vehiculoId||'';
+      const descEsperada=`Gasto [${cod}]: ${g.tipo} — ${g.descripcion||''}`;
+      const yaEnCaja=DB.caja.some(c=>c.tipo==='SALIDA'&&c.categoria==='Gasto de Vehículo'&&c.descripcion===descEsperada);
+      if(yaEnCaja)return;
+      const pagado=parseFloat(g.montoPagado||0);
+      const montoTotal=parseFloat(g.monto||g.montoFactura||0);
+      const montoACaja=pagado>0?pagado:montoTotal;
+      if(!montoACaja||montoACaja<=0)return;
+      DB.caja.push({id:uid(),fecha:g.fechaPago||g.fecha||today(),tipo:'SALIDA',categoria:'Gasto de Vehículo',descripcion:descEsperada,monto:montoACaja,banco:g.banco||'',cuenta:g.cuenta||'',referencia:g.cuenta||'',referencia_gasto:g.id,responsable:'Sistema'});
+      agregados++;
+    });
+
+    // ── Nómina ──
+    const cajaNom=new Set(DB.caja.filter(c=>c.tipo==='SALIDA'&&c.categoria==='Nómina/Salario').map(c=>c.referencia_nomina||'').filter(Boolean));
+    (DB.nominaPagos||[]).forEach(p=>{
+      if(cajaNom.has(p.id))return;
+      const monto=parseFloat(p.monto||0);
+      if(!monto||monto<=0)return;
+      // verificar por descripción para registros sin referencia_nomina
+      const descN=`Nómina: ${p.empleado||p.nombre||'—'} — ${p.periodo||''}`;
+      const yaEnCajaN=DB.caja.some(c=>c.tipo==='SALIDA'&&c.categoria==='Nómina/Salario'&&c.descripcion===descN);
+      if(yaEnCajaN)return;
+      DB.caja.push({id:uid(),fecha:p.fecha||today(),tipo:'SALIDA',categoria:'Nómina/Salario',descripcion:descN,monto,banco:p.banco||'',cuenta:p.cuenta||'',referencia:p.periodo||'',referencia_nomina:p.id,responsable:'Sistema'});
+      agregados++;
+    });
+
+    if(agregados>0){
+      sDB('caja');
+      console.log(`[CajaMigración] ${agregados} registros históricos agregados a caja.`);
+    }
+  }catch(e){
+    console.warn('[CajaMigración] Error silencioso:',e);
+  }
+}
 
 // ══ CAJA ══
 function actualizarTasaCaja(){
@@ -6575,6 +6625,12 @@ function guardarNuevoGastoVeh(){
     const totalGastos=DB.gastosVehiculos.filter(x=>x.vehiculoId===vid).reduce((a,x)=>a+parseFloat(x.montoFactura||0),0);
     DB.vehiculos[iv].costo=totalGastos;
     sDB('vehiculos');
+  }
+  // Registrar en caja si hay abono pagado
+  if(abono>0){
+    const _vehCod=DB.vehiculos.find(v=>v.id===vid)?.codigo||vid;
+    DB.caja.push({id:uid(),fecha:g.fechaPago||g.fecha||today(),tipo:'SALIDA',categoria:'Gasto de Vehículo',descripcion:`Gasto [${_vehCod}]: ${g.tipo} — ${g.suplidor||''}`,monto:abono,banco:bancoVal,cuenta:cuentaVal,referencia:cuentaVal,referencia_gasto:g.id,responsable:currentUser?.nombre||''});
+    sDB('caja');
   }
   sDB('gastosVehiculos');
   logBit('gastosVeh','Registró gasto',tipo+' — '+sup+' '+fmtMoneyDisplay(factura));

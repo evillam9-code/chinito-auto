@@ -2729,7 +2729,7 @@ function formVehiculo(v){
       <div class="form-field"><label>Tracción</label>
         <select id="v-traccion">
           <option value="">Seleccionar...</option>
-          ${['4X4','4X2','AWD','FWD','RWD'].map(t=>`<option ${t.toUpperCase()===(v?.traccion||'').toUpperCase()?'selected':''}>${t}</option>`).join('')}
+          ${['4X4','4X2','4WD','2WD','AWD','FWD','RWD'].map(t=>`<option ${t.toUpperCase()===(v?.traccion||'').toUpperCase()?'selected':''}>${t}</option>`).join('')}
         </select>
       </div>
       <div class="form-field"><label>Combustible</label>
@@ -3010,8 +3010,9 @@ function agregarGastoVeh(vid){
   if(!DB.gastosVehiculos)DB.gastosVehiculos=[];
   const g={id:uid(),vehiculoId:vid,fecha:document.getElementById('gv-fecha').value,tipo:document.getElementById('gv-tipo').value,descripcion:document.getElementById('gv-desc').value,monto,formaPago:document.getElementById('gv-forma').value,cuenta:document.getElementById('gv-cuenta').value};
   DB.gastosVehiculos.push(g);
-  DB.caja.push({id:uid(),fecha:g.fecha,tipo:'SALIDA',categoria:'Gasto de Vehículo',descripcion:`Gasto [${DB.vehiculos.find(v=>v.id===vid)?.codigo||vid}]: ${g.tipo} — ${g.descripcion}`,monto,referencia:g.cuenta,cuenta:g.cuenta||'',banco:g.banco||'',responsable:currentUser?.nombre||''});
+  DB.caja.push({id:uid(),fecha:g.fecha,tipo:'SALIDA',categoria:'Gasto de Vehículo',descripcion:`Gasto [${DB.vehiculos.find(v=>v.id===vid)?.codigo||vid}]: ${g.tipo} — ${g.descripcion}`,monto,referencia:g.cuenta,cuenta:limpiarCuenta(g.cuenta||''),banco:normalizarBancoGlobal(g.banco||''),moneda:'RD$',responsable:currentUser?.nombre||''});
   sDB('gastosVehiculos');sDB('caja');toast('Gasto agregado ✓','success');gastosVehiculo(vid);
+  refreshCajaIfActive();
 }
 function eliminarGastoVeh(gid,vid){if(currentUser?.role!=='admin'&&!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}DB.gastosVehiculos=(DB.gastosVehiculos||[]).filter(g=>g.id!==gid);sDB('gastosVehiculos');toast('Eliminado','success');gastosVehiculo(vid);}
 
@@ -3049,7 +3050,7 @@ function _autoMigrarCaja(){
       const montoTotal=parseFloat(g.monto||g.montoFactura||0);
       const montoACaja=pagado>0?pagado:montoTotal;
       if(!montoACaja||montoACaja<=0)return;
-      DB.caja.push({id:uid(),fecha:g.fechaPago||g.fecha||today(),tipo:'SALIDA',categoria:'Gasto de Vehículo',descripcion:descEsperada,monto:montoACaja,banco:g.banco||'',cuenta:g.cuenta||'',referencia:g.cuenta||'',referencia_gasto:g.id,responsable:'Sistema'});
+      DB.caja.push({id:uid(),fecha:g.fechaPago||g.fecha||today(),tipo:'SALIDA',categoria:'Gasto de Vehículo',descripcion:descEsperada,monto:montoACaja,banco:normalizarBancoGlobal(g.banco||''),cuenta:limpiarCuenta(g.cuenta||''),referencia:g.cuenta||'',referencia_gasto:g.id,moneda:'RD$',responsable:'Sistema'});
       agregados++;
     });
 
@@ -3063,12 +3064,13 @@ function _autoMigrarCaja(){
       const descN=`Nómina: ${p.empleado||p.nombre||'—'} — ${p.periodo||''}`;
       const yaEnCajaN=DB.caja.some(c=>c.tipo==='SALIDA'&&c.categoria==='Nómina/Salario'&&c.descripcion===descN);
       if(yaEnCajaN)return;
-      DB.caja.push({id:uid(),fecha:p.fecha||today(),tipo:'SALIDA',categoria:'Nómina/Salario',descripcion:descN,monto,banco:p.banco||'',cuenta:p.cuenta||'',referencia:p.periodo||'',referencia_nomina:p.id,responsable:'Sistema'});
+      DB.caja.push({id:uid(),fecha:p.fecha||today(),tipo:'SALIDA',categoria:'Nómina/Salario',descripcion:descN,monto,banco:normalizarBancoGlobal(p.banco||''),cuenta:limpiarCuenta(p.cuenta||''),referencia:p.periodo||'',referencia_nomina:p.id,moneda:'RD$',responsable:'Sistema'});
       agregados++;
     });
 
     if(agregados>0){
       sDB('caja');
+      refreshCajaIfActive();
       console.log(`[CajaMigración] ${agregados} registros históricos agregados a caja.`);
     }
   }catch(e){
@@ -3137,7 +3139,23 @@ function _normalizarCaja(){
     }
   });
   if(changed)sDB('caja');
+  refreshCajaIfActive();
 }
+
+function normalizarBancoGlobal(b){
+  if(!b)return b;const u=b.toUpperCase();
+  if(u==='BANCO POPULAR - EMPRESA'||u==='BANCO POPULAR-EMPRESA')return 'Banco Popular - Empresa';
+  if(u==='BANRESERVAS'||u==='BANCO DE RESERVAS')return 'Banreservas';
+  if(u.startsWith('BANCO POPULAR')&&!u.includes('EMPRESA'))return 'Banco Popular';
+  if(b===u&&b.length>3)return b.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+  return b;
+}
+function limpiarCuenta(c){if(!c)return c;return c.replace(/ [(][^)]+[)]$/,'').trim();}
+function refreshCajaIfActive(){
+  const p=document.getElementById('page-caja');
+  if(p&&p.classList.contains('active'))renderCaja();
+}
+
 function renderCaja(){
   _normalizarCaja();
   const mes=document.getElementById('caja-mes')?.value||today().slice(0,7);
@@ -3220,9 +3238,39 @@ function renderCaja(){
 
   const cuentasData=vista==='ACUMULADO'?cuentasAcum:cuentasMes;
 
+  // ALL_ACCOUNTS dinamico
+  const _nB=b=>{
+    if(!b)return b;const u=b.toUpperCase();
+    if(u==='BANCO POPULAR - EMPRESA'||u==='BANCO POPULAR-EMPRESA')return 'Banco Popular - Empresa';
+    if(u==='BANRESERVAS'||u==='BANCO DE RESERVAS')return 'Banreservas';
+    if(u.startsWith('BANCO POPULAR')&&!u.includes('EMPRESA'))return 'Banco Popular';
+    if(b===u&&b.length>3)return b.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+    return b;
+  };
+  const ALL_ACCOUNTS=[];
+  (DB.config.bancoCuentas||[]).forEach(b=>{
+    const bn=_nB(b.banco);
+    (b.cuentas||[]).forEach(c=>{
+      const tipo=c.tipo||'';
+      const isEfec=tipo.toLowerCase().includes('efectivo');
+      const isUSD=tipo.includes('USD')||tipo.includes('Dólares');
+      ALL_ACCOUNTS.push({banco:isEfec?'💵 Efectivo':bn,cuenta:tipo+' — '+c.numero,moneda:isUSD?'USD':'RD$'});
+    });
+  });
+  const allCuentasData={};
+  ALL_ACCOUNTS.forEach(a=>{
+    const k=`${a.banco}||${a.cuenta}||${a.moneda}`;
+    allCuentasData[k]={banco:a.banco,cuenta:a.cuenta,moneda:a.moneda,entradas:0,salidas:0,sinMovs:true};
+  });
+  Object.entries(cuentasData).forEach(([k,v])=>{
+    const parts=k.split('||');
+    const nk=`${_nB(parts[0])||parts[0]}||${parts[1]}||${parts[2]}`;
+    if(allCuentasData[nk]){allCuentasData[nk].entradas=v.entradas;allCuentasData[nk].salidas=v.salidas;allCuentasData[nk].sinMovs=(v.entradas===0&&v.salidas===0);}
+    else allCuentasData[nk]={banco:_nB(parts[0])||parts[0],cuenta:parts[1],moneda:parts[2],entradas:v.entradas,salidas:v.salidas,sinMovs:false};
+  });
   // Agrupar por banco para las tarjetas
   const bancoGroups={};
-  Object.values(cuentasData).forEach(c=>{
+  Object.values(allCuentasData).forEach(c=>{
     if(!bancoGroups[c.banco])bancoGroups[c.banco]=[];
     bancoGroups[c.banco].push(c);
   });
@@ -3352,7 +3400,7 @@ function renderCaja(){
     </div>
 
     <!-- Tarjetas por banco/cuenta -->
-    ${Object.keys(bancoGroups).length>0?bancoCards:'<div class="card" style="text-align:center;padding:24px;color:var(--gray)">Sin movimientos registrados en este período</div>'}
+    ${bancoCards}
     `:''}<!-- fin verSaldoCaja -->
     ${(currentUser?.role==='admin'||(currentUser?.modulos||[]).includes('verSaldoCaja'))?`
     <div class="card" style="background:var(--navy);margin-bottom:16px">
@@ -3382,6 +3430,7 @@ function renderCaja(){
           <td style="font-size:12px;color:var(--gray)">${escHtml(c.referencia||'—')}</td>
           <td style="font-size:12px">${escHtml(c.responsable||'—')}</td>
           <td>${(currentUser?.role==='admin'||canDo('eliminar'))?`<button class="btn btn-red btn-sm" onclick="DB.caja.splice(${i},1);sDB('caja');renderCaja()">🗑</button>`:''}</td>
+          refreshCajaIfActive();
         </tr>`;}).join('')||'<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--gray)">Sin registros</td></tr>'}
         </tbody></table></div>
     </div>`;
@@ -3509,10 +3558,11 @@ function guardarCajaMov(tipo){
   const moneda=document.getElementById('cj-moneda')?.value||'RD$';
   DB.caja.push({id:uid(),fecha:document.getElementById('cj-fecha').value,tipo,
     categoria:document.getElementById('cj-cat')?.value||'',
-    descripcion:desc,monto,moneda,banco,cuenta,
+    banco:normalizarBancoGlobal(banco),cuenta:limpiarCuenta(cuenta),moneda,descripcion:desc,monto,moneda,banco,cuenta,
     referencia:banco+(cuenta?' / '+cuenta:''),
     responsable:document.getElementById('cj-resp').value});
   logBit('caja','Registro manual de caja','');sDB('caja');closeModal();toast('Registro guardado ✓','success');renderCaja();
+  refreshCajaIfActive();
 }
 
 // ══ GASTOS ══
@@ -3712,8 +3762,9 @@ function guardarGasto(idx){
   if(idx!==undefined)DB.gastos[idx]=g;
   else DB.gastos.push(g);
   if(g.formaPago==='CONTADO'&&montoAbonado>0)
-    DB.caja.push({id:uid(),fecha:g.fecha,tipo:'SALIDA',categoria:'Gasto de Empresa',descripcion:'Gasto: '+desc,monto:montoAbonado,banco:g.banco||'',cuenta:g.cuenta||'',responsable:g.responsable});
+    DB.caja.push({id:uid(),fecha:g.fecha,tipo:'SALIDA',categoria:'Gasto de Empresa',descripcion:'Gasto: '+desc,monto:montoAbonado,banco:normalizarBancoGlobal(g.banco||''),cuenta:limpiarCuenta(g.cuenta||''),moneda:'RD$',responsable:g.responsable});
   logBit('gastos','Guardó gasto empresa','');sDB('gastos');sDB('caja');closeModal();toast('Gasto guardado ✓','success');renderGastos();
+  refreshCajaIfActive();
 }
 
 // ══ NÓMINA ══
@@ -3880,8 +3931,21 @@ function guardarEditPagoNomina(pid){
   if(!monto||monto<=0){toast('El monto debe ser mayor a 0','error');return;}
   const idx=(DB.nominaPagos||[]).findIndex(p=>p.id===pid);
   if(idx<0){toast('Pago no encontrado','error');return;}
-  DB.nominaPagos[idx]={...DB.nominaPagos[idx],fecha,monto,tipo,nota};
-  sDB('nominaPagos');closeModal();toast('Pago actualizado ✓','success');renderNomina();
+  const banco_ep=normalizarBancoGlobal(document.getElementById('ep-banco')?.value||DB.nominaPagos[idx].banco||'');
+  const cuenta_ep=limpiarCuenta(document.getElementById('ep-cuenta')?.value||DB.nominaPagos[idx].cuenta||'');
+  const moneda_ep=document.getElementById('ep-moneda')?.value||DB.nominaPagos[idx].moneda||'RD$';
+  // Sync caja: remove old, add new
+  const montoAntes=parseFloat(DB.nominaPagos[idx].monto||0);
+  const fechaAntes=DB.nominaPagos[idx].fecha||'';
+  DB.caja=DB.caja.filter(c=>!(c.categoria==='Nómina/Salario'&&c.fecha===fechaAntes&&Math.abs(parseFloat(c.monto||0)-montoAntes)<0.01));
+  DB.nominaPagos[idx]={...DB.nominaPagos[idx],fecha,monto,tipo,nota,banco:banco_ep,cuenta:cuenta_ep,moneda:moneda_ep};
+  DB.caja.push({id:uid(),fecha,tipo:'SALIDA',categoria:'Nómina/Salario',
+    banco:banco_ep,cuenta:cuenta_ep,moneda:moneda_ep,descripcion:'Pago nómina: '+(DB.nominaPagos[idx].empleadoNombre||''),
+    monto,moneda:moneda_ep,banco:banco_ep,cuenta:cuenta_ep,
+    referencia:banco_ep&&cuenta_ep?banco_ep+' / '+cuenta_ep:cuenta_ep,
+    responsable:currentUser?.nombre||''});
+  sDB('nominaPagos');sDB('caja');refreshCajaIfActive();
+  closeModal();toast('Pago actualizado ✓','success');renderNomina();
 }
 function registrarPagoNomina(i){
   const e=DB.nomina[i];
@@ -3954,9 +4018,10 @@ function guardarPagoNomina(i){
   if(!DB.nominaPagos)DB.nominaPagos=[];
   DB.nominaPagos.push({id:uid(),empleadoId:e.id,empleadoNombre:e.nombre,mes,fecha,tipo,monto,banco,cuenta,moneda,nota});
   DB.caja.push({id:uid(),fecha,tipo:'SALIDA',categoria:'Nómina/Salario',
-    descripcion:'Pago nómina: '+e.nombre+' ('+tipoLabel+')',
+    banco:normalizarBancoGlobal(banco),cuenta:limpiarCuenta(cuenta),moneda,descripcion:'Pago nómina: '+e.nombre+' ('+tipoLabel+')',
     monto,moneda,banco,referencia:cuenta,responsable:currentUser.nombre,banco:document.getElementById('np-banco')?.value||'',cuenta:document.getElementById('np-cuenta')?.value||''});
   logBit('nomina','Pagó nómina','');sDB('nominaPagos');sDB('caja');closeModal();toast('Pago registrado ✓','success');renderNomina();
+  refreshCajaIfActive();
 }
 function imprimirPagosNomina(){
   const pagos=DB.nominaPagos||[];
@@ -6629,8 +6694,9 @@ function guardarNuevoGastoVeh(){
   // Registrar en caja si hay abono pagado
   if(abono>0){
     const _vehCod=DB.vehiculos.find(v=>v.id===vid)?.codigo||vid;
-    DB.caja.push({id:uid(),fecha:g.fechaPago||g.fecha||today(),tipo:'SALIDA',categoria:'Gasto de Vehículo',descripcion:`Gasto [${_vehCod}]: ${g.tipo} — ${g.suplidor||''}`,monto:abono,banco:bancoVal,cuenta:cuentaVal,referencia:cuentaVal,referencia_gasto:g.id,responsable:currentUser?.nombre||''});
+    DB.caja.push({id:uid(),fecha:g.fechaPago||g.fecha||today(),tipo:'SALIDA',categoria:'Gasto de Vehículo',descripcion:`Gasto [${_vehCod}]: ${g.tipo} — ${g.suplidor||''}`,monto:abono,banco:normalizarBancoGlobal(bancoVal),cuenta:limpiarCuenta(cuentaVal),referencia:cuentaVal,referencia_gasto:g.id,moneda:'RD$',responsable:currentUser?.nombre||''});
     sDB('caja');
+    refreshCajaIfActive();
   }
   sDB('gastosVehiculos');
   logBit('gastosVeh','Registró gasto',tipo+' — '+sup+' '+fmtMoneyDisplay(factura));
@@ -6684,6 +6750,20 @@ function confirmarAbonoGastoVeh(i){
     DB.gastosVehiculos[i].statusGasto='PAGADO';
   } else {
     DB.gastosVehiculos[i].statusGasto='ABONADO';
+  }
+  // Registrar en caja
+  const abgvBanco=normalizarBancoGlobal(document.getElementById('abgv-banco')?.value||'');
+  const abgvCuenta=limpiarCuenta(document.getElementById('abgv-cuenta')?.value||'');
+  const abgvMoneda=document.getElementById('abgv-moneda')?.value||g.moneda||'RD$';
+  const abgvFecha=document.getElementById('abgv-fecha')?.value||today();
+  if(monto>0){
+    DB.caja.push({id:uid(),fecha:abgvFecha,tipo:'SALIDA',categoria:'Gasto de Vehículo',
+      banco:abgvBanco,cuenta:abgvCuenta,moneda:abgvMoneda,descripcion:`Abono GV [${g.vehiculo||g.vehiculoId||''}]: ${g.tipo||''} — ${g.suplidor||''}`,
+      monto,moneda:abgvMoneda,banco:abgvBanco,cuenta:abgvCuenta,
+      referencia:abgvBanco&&abgvCuenta?abgvBanco+' / '+abgvCuenta:abgvCuenta,
+      responsable:currentUser?.nombre||''});
+    sDB('caja');
+    refreshCajaIfActive();
   }
   sDB('gastosVehiculos');
   logBit('gastosVeh','Registró pago/abono','');
@@ -6779,6 +6859,22 @@ function guardarEditGastoVeh(i){
     sDB('vehiculos');
   }
   sDB('gastosVehiculos');
+  // Sync caja
+  const _gvOld=DB.gastosVehiculos[idx2];
+  const _gvMontoAntes=parseFloat(_gvOld.montoAbonado||_gvOld.monto||0);
+  const _gvFechaAntes=_gvOld.fecha||'';
+  DB.caja=DB.caja.filter(c=>!(c.categoria==='Gasto de Vehículo'&&c.fecha===_gvFechaAntes&&Math.abs(parseFloat(c.monto||0)-_gvMontoAntes)<0.01));
+  const _gvNuevoBanco=normalizarBancoGlobal(document.getElementById('egv-banco')?.value||_gvOld.banco||'');
+  const _gvNuevaCuenta=limpiarCuenta(document.getElementById('egv-cuenta')?.value||_gvOld.cuenta||'');
+  const _gvNuevaMoneda=document.getElementById('egv-moneda')?.value||_gvOld.moneda||'RD$';
+  const _gvNuevoMonto=parseFloat((document.getElementById('egv-factura')?.value||'0').replace(/,/g,''));
+  if(_gvNuevoBanco&&_gvNuevaCuenta&&_gvNuevoMonto>0){
+    DB.caja.push({id:uid(),fecha:DB.gastosVehiculos[idx2].fecha,tipo:'SALIDA',categoria:'Gasto de Vehículo',
+      banco:_gvNuevoBanco,cuenta:_gvNuevaCuenta,moneda:_gvNuevaMoneda,descripcion:`Gasto [${DB.gastosVehiculos[idx2].vehiculo||''}]: ${DB.gastosVehiculos[idx2].tipo||''} — ${DB.gastosVehiculos[idx2].suplidor||''}`,
+      monto:_gvNuevoMonto,moneda:_gvNuevaMoneda,banco:_gvNuevoBanco,cuenta:_gvNuevaCuenta,
+      referencia:_gvNuevoBanco+' / '+_gvNuevaCuenta,responsable:currentUser?.nombre||''});
+    sDB('caja');refreshCajaIfActive();
+  }
   logBit('gastosVeh','Editó gasto','');
   closeModal();
   toast('Gasto actualizado ✓','success');
@@ -8035,8 +8131,8 @@ function confirmarVenta(nf){
   // Registrar en caja
   const montoCajaVenta=(montoRecibido>0)?(inicial-montoRecibido):inicial||precio;
   const _bv=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===cuenta))?.banco||document.getElementById('sv-banco')?.value||'';
-  DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Venta de Vehículo',descripcion:`Venta: ${v.codigo} ${v.marca} ${v.modelo}`,monto:montoCajaVenta,referencia:nf,cuenta,banco:_bv,responsable:currentUser.nombre});
-  if(montoRecibido>0)DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Vehículo Recibido como P/Pago',descripcion:`Vehículo recibido: ${venta.vehiculoRecibido?.vehiculo||'—'} — Venta: ${nf}`,monto:montoRecibido,referencia:nf,cuenta,banco:_bv,responsable:currentUser.nombre});
+  DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Venta de Vehículo',descripcion:`Venta: ${v.codigo} ${v.marca} ${v.modelo}`,monto:montoCajaVenta,referencia:nf,cuenta:limpiarCuenta(cuenta),moneda:monedaVenta||'RD$',referencia:nf,cuenta,banco:normalizarBancoGlobal(_bv),moneda:'RD$',responsable:currentUser.nombre});
+  if(montoRecibido>0)DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Vehículo Recibido como P/Pago',descripcion:`Vehículo recibido: ${venta.vehiculoRecibido?.vehiculo||'—'} — Venta: ${nf}`,monto:montoRecibido,referencia:nf,cuenta:limpiarCuenta(cuenta),moneda:monedaVenta||'RD$',referencia:nf,cuenta,banco:normalizarBancoGlobal(_bv),moneda:'RD$',responsable:currentUser.nombre});
   // Si hay pendiente → CxC automática
   if(pendiente>0){
     const abonadoInicial=inicial+montoRecibido;
@@ -8106,6 +8202,7 @@ function confirmarVenta(nf){
     }
   }
   sDB('ventas');sDB('caja');
+  refreshCajaIfActive();
   closeModal();
   // Imprimir recibo automáticamente
   imprimirFactura(venta.id);
@@ -8578,8 +8675,8 @@ function confirmarVenta(nf){
   // Registrar en caja
   const montoCajaVenta=(montoRecibido>0)?(inicial-montoRecibido):inicial||precio;
   const _bv=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===cuenta))?.banco||document.getElementById('sv-banco')?.value||'';
-  DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Venta de Vehículo',descripcion:`Venta: ${v.codigo} ${v.marca} ${v.modelo}`,monto:montoCajaVenta,referencia:nf,cuenta,banco:_bv,responsable:currentUser.nombre});
-  if(montoRecibido>0)DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Vehículo Recibido como P/Pago',descripcion:`Vehículo recibido: ${venta.vehiculoRecibido?.vehiculo||'—'} — Venta: ${nf}`,monto:montoRecibido,referencia:nf,cuenta,banco:_bv,responsable:currentUser.nombre});
+  DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Venta de Vehículo',descripcion:`Venta: ${v.codigo} ${v.marca} ${v.modelo}`,monto:montoCajaVenta,referencia:nf,cuenta:limpiarCuenta(cuenta),moneda:monedaVenta||'RD$',referencia:nf,cuenta,banco:normalizarBancoGlobal(_bv),moneda:'RD$',responsable:currentUser.nombre});
+  if(montoRecibido>0)DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Vehículo Recibido como P/Pago',descripcion:`Vehículo recibido: ${venta.vehiculoRecibido?.vehiculo||'—'} — Venta: ${nf}`,monto:montoRecibido,referencia:nf,cuenta:limpiarCuenta(cuenta),moneda:monedaVenta||'RD$',referencia:nf,cuenta,banco:normalizarBancoGlobal(_bv),moneda:'RD$',responsable:currentUser.nombre});
   // Si hay pendiente → CxC automática
   if(pendiente>0){
     const abonadoInicial=inicial+montoRecibido;
@@ -8649,6 +8746,7 @@ function confirmarVenta(nf){
     }
   }
   sDB('ventas');sDB('caja');
+  refreshCajaIfActive();
   closeModal();
   // Imprimir recibo automáticamente
   imprimirFactura(venta.id);
@@ -8714,8 +8812,9 @@ function confirmarAbVenta(vid){
     sDB('cxc');
   }
   const _abCuenta=document.getElementById('ab-cuenta')?.value||'';const _abBanco=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===_abCuenta))?.banco||'';
-DB.caja.push({id:uid(),fecha:document.getElementById('ab-fecha').value,tipo:'ENTRADA',categoria:'Cobro de Venta',descripcion:`Cobro ${DB.ventas[i].factura}: ${DB.ventas[i].cliente}`,monto,referencia:_abCuenta,cuenta:_abCuenta,banco:_abBanco,responsable:currentUser.nombre});
+DB.caja.push({id:uid(),fecha:document.getElementById('ab-fecha').value,tipo:'ENTRADA',categoria:'Cobro de Venta',descripcion:`Cobro ${DB.ventas[i].factura}: ${DB.ventas[i].cliente}`,monto,referencia:_abCuenta,cuenta:limpiarCuenta(_abCuenta),banco:normalizarBancoGlobal(_abBanco),moneda:'RD$',responsable:currentUser.nombre});
   sDB('ventas');sDB('caja');
+  refreshCajaIfActive();
   closeModal();
   logBit('ventas','Registró cobro','');toast('Cobro registrado ✓','success');
   renderVentas();
@@ -10367,6 +10466,22 @@ function guardarEditCXP(gid, origen){
   arr[i].montoPendiente = pendiente;
   arr[i].fecha = document.getElementById('ecxp-fecha').value;
   arr[i].statusGasto = pendiente<=0?'PAGADO':pagado>0?'ABONADO':'PENDIENTE';
+  // Sync caja
+  const _cxpPagAntes=parseFloat(arr[i].montoPagado||0);
+  const _cxpNuevoBanco=normalizarBancoGlobal(document.getElementById('ecxp-banco')?.value||arr[i].banco||'');
+  const _cxpNuevaCuenta=limpiarCuenta(document.getElementById('ecxp-cuenta')?.value||arr[i].cuenta||'');
+  const _cxpNuevaMoneda=document.getElementById('ecxp-moneda')?.value||arr[i].moneda||'RD$';
+  if(_cxpPagAntes>0){
+    DB.caja=DB.caja.filter(c=>!((c.categoria==='CXP Manual'||c.categoria==='Pago CxP'||c.categoria==='CXP USD')&&Math.abs(parseFloat(c.monto||0)-_cxpPagAntes)<0.01&&c.fecha===(arr[i].fechaPago||arr[i].fecha||'')));
+  }
+  if(pagado>0){
+    DB.caja.push({id:uid(),fecha:arr[i].fechaPago||arr[i].fecha||today(),tipo:'SALIDA',
+      categoria:'CXP Manual',banco:_cxpNuevoBanco,cuenta:_cxpNuevaCuenta,moneda:_cxpNuevaMoneda,descripcion:'Pago CXP: '+(arr[i].descripcion||'')+(arr[i].suplidor?' — '+arr[i].suplidor:''),
+      monto:pagado,moneda:_cxpNuevaMoneda,banco:_cxpNuevoBanco,cuenta:_cxpNuevaCuenta,
+      referencia:_cxpNuevoBanco&&_cxpNuevaCuenta?_cxpNuevoBanco+' / '+_cxpNuevaCuenta:_cxpNuevaCuenta,
+      responsable:currentUser?.nombre||''});
+    sDB('caja');refreshCajaIfActive();
+  }
   if(origen==='manual') sDB('cxp'); else sDB('gastosVehiculos');
   closeModal();
   toast('CxP actualizada ✓','success');
@@ -10458,6 +10573,16 @@ function guardarCXPManual(){
     statusGasto:pendiente<=0?'PAGADO':abono>0?'ABONADO':'PENDIENTE',
     pagos:[]
   });
+  if(abono>0){
+    const cxpmBanco=normalizarBancoGlobal(banco||'');
+    const cxpmCuenta=limpiarCuenta(cuenta||'');
+    DB.caja.push({id:uid(),fecha:document.getElementById('cxpm-fecha')?.value||today(),tipo:'SALIDA',
+      categoria:'CXP Manual',banco:cxpmBanco,cuenta:cxpmCuenta,moneda,descripcion:'Pago CXP: '+desc+(sup?' — '+sup:''),
+      monto:abono,moneda,banco:cxpmBanco,cuenta:cxpmCuenta,
+      referencia:cxpmBanco&&cxpmCuenta?cxpmBanco+' / '+cxpmCuenta:cxpmCuenta,
+      responsable:currentUser?.nombre||''});
+    sDB('caja');refreshCajaIfActive();
+  }
   logBit('cxp','Nueva CXP manual','');
   sDB('cxp');
   closeModal();toast('CXP manual guardada ✓','success');renderCXP();
@@ -10517,9 +10642,10 @@ function confirmarPagoCXPManual(i){
   DB.cxp[i].pagos.push({id:uid(),fecha,monto,banco,cuenta,responsable:currentUser?.nombre||''});
   DB.cxp[i].statusGasto=DB.cxp[i].montoPendiente<=0?'PAGADO':'ABONADO';
   DB.caja.push({id:uid(),fecha,tipo:'SALIDA',categoria:'CXP Manual',
-    descripcion:'Pago CXP: '+g.descripcion+(g.suplidor?' \u2014 '+g.suplidor:''),
+    banco:normalizarBancoGlobal(banco),cuenta:limpiarCuenta(cuenta),moneda:moneda||'RD$',descripcion:'Pago CXP: '+g.descripcion+(g.suplidor?' \u2014 '+g.suplidor:''),
     monto,referencia:cuenta,banco,responsable:currentUser?.nombre||'',banco:document.getElementById('cxpm-pay-banco')?.value||'',cuenta:document.getElementById('cxpm-pay-cuenta')?.value||''});
   sDB('cxp');sDB('caja');
+  refreshCajaIfActive();
   closeModal();toast('Pago registrado \u2713','success');renderCXP();
 }
 function abonarDesdeCXP(gid){
@@ -10569,8 +10695,9 @@ function confirmarPagoCXP(i){
   if(!DB.gastosVehiculos[i].pagos)DB.gastosVehiculos[i].pagos=[];
   DB.gastosVehiculos[i].pagos.push({id:uid(),fecha:fechaPago,monto,cuenta:cuentaPago,nota:notaPago,saldado});
   const _bancoCXP=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===cuentaPago))?.banco||'';
-  DB.caja.push({id:uid(),fecha:fechaPago,tipo:'SALIDA',categoria:'Pago CxP',descripcion:`Pago CxP: ${DB.gastosVehiculos[i].suplidor||'—'} — ${DB.gastosVehiculos[i].tipo||'—'}`,monto,banco:_bancoCXP,cuenta:cuentaPago,referencia:DB.gastosVehiculos[i].descripcion||'',responsable:currentUser?.nombre||''});
+  DB.caja.push({id:uid(),fecha:fechaPago,tipo:'SALIDA',categoria:'Pago CxP',descripcion:`Pago CxP: ${DB.gastosVehiculos[i].suplidor||'—'} — ${DB.gastosVehiculos[i].tipo||'—'}`,monto,banco:normalizarBancoGlobal(_bancoCXP),cuenta:limpiarCuenta(cuentaPago),referencia:DB.gastosVehiculos[i].descripcion||'',moneda:'RD$',responsable:currentUser?.nombre||''});
   sDB('gastosVehiculos');sDB('caja');
+  refreshCajaIfActive();
   closeModal();
   // Generar recibo de pago
   imprimirReciboPagoCXP(DB.gastosVehiculos[i],{fecha:fechaPago,monto,cuenta:cuentaPago,nota:notaPago,saldado});
@@ -11009,9 +11136,10 @@ function guardarCXCManual(){
     esManual:true
   });
   if(abono>0)DB.caja.push({id:uid(),fecha,tipo:'ENTRADA',categoria:'CxC Manual',
-    descripcion:'Abono CxC: '+concepto+' — '+cli?.nombre,
+    banco:normalizarBancoGlobal(banco),cuenta:limpiarCuenta(cuenta),moneda,descripcion:'Abono CxC: '+concepto+' — '+cli?.nombre,
     monto:abono,referencia:cuenta,responsable:currentUser.nombre,banco:document.getElementById('ncxc-banco')?.value||'',cuenta:document.getElementById('ncxc-cuenta')?.value||''});
   sDB('cxc');sDB('caja');closeModal();
+  refreshCajaIfActive();
   toast('Cuenta por cobrar creada ✓','success');renderCXC();
 }
 function cxcAccion(accion){
@@ -11090,8 +11218,9 @@ function confirmarAbonarCXC(id){
       sDB('ventas');
     }
   }
-  DB.caja.push({id:uid(),fecha:fechaCobro,tipo:'ENTRADA',categoria:'Cobro CxC',descripcion:`Cobro CxC: ${DB.cxc[i].cliente} — ${DB.cxc[i].factura}`,monto,banco:bancoCobro,cuenta:cuentaCobro,referencia:bancoCobro?(bancoCobro+' / '+cuentaCobro):cuentaCobro,responsable:currentUser.nombre});
+  DB.caja.push({id:uid(),fecha:fechaCobro,tipo:'ENTRADA',categoria:'Cobro CxC',descripcion:`Cobro CxC: ${DB.cxc[i].cliente} — ${DB.cxc[i].factura}`,monto,banco:normalizarBancoGlobal(bancoCobro),cuenta:limpiarCuenta(cuentaCobro),referencia:bancoCobro?(bancoCobro+' / '+cuentaCobro):cuentaCobro,moneda:'RD$',responsable:currentUser.nombre});
   sDB('cxc');sDB('caja');
+  refreshCajaIfActive();
   closeModal();
   imprimirReciboCobro(DB.cxc[i],{id:uid(),fecha:fechaCobro,monto,cuenta:cuentaCobro,nota:notaCobro,saldado});
   toast(saldado?'✅ Cuenta saldada — Generando recibo...':'💵 Abono registrado — Generando recibo...','success');
@@ -11816,9 +11945,10 @@ function pagarCuotaSeguro(id,idx){
   if(qp!=='pendiente'){
     const tipoCaja=qp==='cliente'?'ENTRADA':'SALIDA';
     DB.caja.push({id:uid(),fecha:today(),tipo:tipoCaja,categoria:qp==='cliente'?'Cobro Seguro (Cliente)':'Seguro Vehículo',
-      descripcion:'Cuota '+(idx+1)+' seguro: '+s.compania+' — '+s.cliente,
+      banco:normalizarBancoGlobal(s.banco||''),cuenta:limpiarCuenta(s.cuenta||''),moneda:s.moneda||'RD$',descripcion:'Cuota '+(idx+1)+' seguro: '+s.compania+' — '+s.cliente,
       monto:montoCuota,referencia:s.cuenta||'',responsable:currentUser.nombre});
     sDB('caja');
+    refreshCajaIfActive();
   }
   s.cuotas[idx].pagado=true;
   s.cuotas[idx].fechaPago=today();
@@ -12130,9 +12260,10 @@ function guardarSeguro(id){
     const tipoCaja=quienPagaVal==='cliente'?'ENTRADA':'SALIDA';
     const catCaja=quienPagaVal==='cliente'?'Cobro Seguro (Cliente)':'Seguro Vehículo';
     DB.caja.push({id:uid(),fecha:today(),tipo:tipoCaja,categoria:catCaja,
-      descripcion:(quienPagaVal==='cliente'?'Cobro':'Pago')+' seguro: '+comp+' — '+cliente+' — Póliza: '+(s.poliza||''),
+      banco:normalizarBancoGlobal(document.getElementById('sgp-banco')?.value||s.banco||''),cuenta:limpiarCuenta(document.getElementById('sgp-cuenta')?.value||s.cuenta||''),moneda:document.getElementById('sgp-moneda')?.value||s.moneda||'RD$',descripcion:(quienPagaVal==='cliente'?'Cobro':'Pago')+' seguro: '+comp+' — '+cliente+' — Póliza: '+(s.poliza||''),
       monto:montoNuevo,referencia:s.cuenta,responsable:currentUser.nombre});
     sDB('caja');
+    refreshCajaIfActive();
   }
   if(id){const i=DB.seguros.findIndex(x=>x.id===id);if(i>=0)DB.seguros[i]=s;}
   else DB.seguros.push(s);
@@ -12197,10 +12328,11 @@ function confirmarAbonoSeguro(id){
     const tipoCajaAbono=qp==='cliente'?'ENTRADA':'SALIDA';
     const catCajaAbono=qp==='cliente'?'Cobro Seguro (Cliente)':'Seguro Vehículo';
     DB.caja.push({id:uid(),fecha,tipo:tipoCajaAbono,categoria:catCajaAbono,
-      descripcion:(qp==='cliente'?'Cobro':'Pago')+' seguro: '+DB.seguros[i].compania+' — '+escHtml(DB.seguros[i].cliente||'')+(DB.seguros[i].poliza?' — Póliza: '+DB.seguros[i].poliza:''),
+      banco:normalizarBancoGlobal(document.getElementById('sgpc-banco')?.value||DB.seguros[i].banco||''),cuenta:limpiarCuenta(document.getElementById('sgpc-cuenta')?.value||DB.seguros[i].cuenta||''),moneda:DB.seguros[i].moneda||'RD$',descripcion:(qp==='cliente'?'Cobro':'Pago')+' seguro: '+DB.seguros[i].compania+' — '+escHtml(DB.seguros[i].cliente||'')+(DB.seguros[i].poliza?' — Póliza: '+DB.seguros[i].poliza:''),
       monto,referencia:cuenta,cuenta:cuenta||'',banco:document.getElementById('sgp-banco')?.value||DB.seguros[i].banco||'',responsable:currentUser.nombre});
   }
   sDB('seguros');sDB('caja');
+  refreshCajaIfActive();
   closeModal();
   toast(DB.seguros[i].pendiente<=0?'✅ Seguro pagado completamente':'💵 Abono registrado ✓','success');
   renderSeguros();
@@ -12425,8 +12557,9 @@ function guardarFacturaExterna(nFact,imprimir=true){
   sDB('facturasExternas');
   if(abono>0){
     const _bancoFE=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===f.cuenta))?.banco||f.banco||'';
-    DB.caja.push({id:uid(),fecha:f.fecha,tipo:'ENTRADA',categoria:'Factura Externa',descripcion:`Factura Externa ${f.numero}: ${f.cliente||f.vehiculo}`,monto:abono,banco:_bancoFE,cuenta:f.cuenta||'',referencia:f.numero,responsable:currentUser?.nombre||''});
+    DB.caja.push({id:uid(),fecha:f.fecha,tipo:'ENTRADA',categoria:'Factura Externa',descripcion:`Factura Externa ${f.numero}: ${f.cliente||f.vehiculo}`,monto:abono,banco:normalizarBancoGlobal(_bancoFE),cuenta:limpiarCuenta(f.cuenta||''),referencia:f.numero,moneda:'RD$',responsable:currentUser?.nombre||''});
     sDB('caja');
+    refreshCajaIfActive();
   }
   closeModal();
   if(imprimir)imprimirFacturaExterna(f.id,true);
@@ -12535,8 +12668,9 @@ function actualizarFacturaExterna(i,imprimir=false){
   const _difAbono=abono-_abonoAnterior;
   if(_difAbono>0){
     const _bancoFEU=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===f.cuenta))?.banco||f.banco||'';
-    DB.caja.push({id:uid(),fecha:f.fecha,tipo:'ENTRADA',categoria:'Factura Externa',descripcion:`Cobro Factura Externa ${f.numero}: ${f.cliente||f.vehiculo}`,monto:_difAbono,banco:_bancoFEU,cuenta:f.cuenta||'',referencia:f.numero,responsable:currentUser?.nombre||''});
+    DB.caja.push({id:uid(),fecha:f.fecha,tipo:'ENTRADA',categoria:'Factura Externa',descripcion:`Cobro Factura Externa ${f.numero}: ${f.cliente||f.vehiculo}`,monto:_difAbono,banco:normalizarBancoGlobal(_bancoFEU),cuenta:limpiarCuenta(f.cuenta||''),referencia:f.numero,moneda:'RD$',responsable:currentUser?.nombre||''});
     sDB('caja');
+    refreshCajaIfActive();
   }
   closeModal();
   if(imprimir)imprimirFacturaExterna(f.id,true);

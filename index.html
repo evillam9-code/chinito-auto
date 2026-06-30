@@ -3014,7 +3014,18 @@ function agregarGastoVeh(vid){
   sDB('gastosVehiculos');sDB('caja');toast('Gasto agregado ✓','success');gastosVehiculo(vid);
   refreshCajaIfActive();
 }
-function eliminarGastoVeh(gid,vid){if(currentUser?.role!=='admin'&&!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}DB.gastosVehiculos=(DB.gastosVehiculos||[]).filter(g=>g.id!==gid);sDB('gastosVehiculos');toast('Eliminado','success');gastosVehiculo(vid);}
+function eliminarGastoVeh(gid,vid){
+  if(currentUser?.role!=='admin'&&!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}
+  const _gvD=(DB.gastosVehiculos||[]).find(g=>g.id===gid);
+  if(_gvD&&(_gvD.formaPago||'CONTADO')!=='CREDITO'){
+    const _mD=parseFloat(_gvD.montoFactura||_gvD.monto||0);
+    const _fD=_gvD.fecha||'';
+    DB.caja=DB.caja.filter(c=>!(c.categoria==='Gasto de Vehículo'&&c.fecha===_fD&&Math.abs(parseFloat(c.monto||0)-_mD)<0.01));
+    sDB('caja');refreshCajaIfActive();
+  }
+  DB.gastosVehiculos=(DB.gastosVehiculos||[]).filter(g=>g.id!==gid);
+  sDB('gastosVehiculos');toast('Eliminado','success');gastosVehiculo(vid);
+}
 
 function imprimirGastosVehiculo(vid){
   const v=DB.vehiculos.find(x=>x.id===vid);if(!v)return;
@@ -3604,26 +3615,81 @@ function gasAccion(accion){
   if(!gasSelectedId)return;
   const i=DB.gastos.findIndex(g=>g.id===gasSelectedId);if(i<0)return;
   if(accion==='editar'&&!canDo('editar')){toast('No tienes permiso para editar','error');return;}else if(accion==='editar')editarGasto(i);
-  else if(accion==='eliminar'&&!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}else if(accion==='eliminar'){if(currentUser?.role!=='admin'&&!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}DB.gastos.splice(i,1);sDB('gastos');toast('Eliminado','success');gasSelectedId=null;renderGastos();}
+  else if(accion==='eliminar'&&!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}else if(accion==='eliminar'){if(currentUser?.role!=='admin'&&!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}
+    const _gE=DB.gastos[i];
+    if(_gE&&(_gE.formaPago==='CONTADO'||_gE.formaPago==='TRANSFERENCIA'||_gE.formaPago==='CHEQUE')){
+      const _mE=parseFloat(_gE.montoAbonado||_gE.monto||0);
+      DB.caja=DB.caja.filter(c=>!(c.categoria==='Gasto de Empresa'&&c.fecha===(_gE.fecha||'')&&Math.abs(parseFloat(c.monto||0)-_mE)<0.01));
+      sDB('caja');refreshCajaIfActive();
+    }
+    DB.gastos.splice(i,1);sDB('gastos');toast('Eliminado','success');gasSelectedId=null;renderGastos();}
 }
 function editarGasto(i){
   const g=DB.gastos[i];
   const catList=['Mantenimiento','Publicidad','Oficina','Transporte','Servicios','Seguro','Legal','Salarios','Otro'];
-  openModal('Editar Gasto',`
-    <div class="form-row c2"><div class="form-field"><label>Fecha</label><input type="date" id="g-fecha" value="${g.fecha||today()}"></div><div class="form-field"><label>Categoría</label><select id="g-cat">${catList.map(c=>`<option ${c===g.categoria?'selected':''}>${c}</option>`).join('')}</select></div></div>
-    <div class="form-row c2"><div class="form-field"><label>Suplidor</label><select id="g-sup"><option value="">Sin suplidor</option>${DB.suplidores.map(s=>`<option ${s.nombre===g.suplidor?'selected':''}>${escHtml(s.nombre)}</option>`).join('')}</select></div><div class="form-field"><label>Monto</label><input type="text" id="g-monto" value="${fmtMoneyDisplay(g.monto||0)}" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div></div>
-    <div class="form-row c2"><div class="form-field"><label>Forma de Pago</label><select id="g-forma"><option value="CONTADO" ${(g.formaPago||'CONTADO')==='CONTADO'?'selected':''}>Contado</option><option value="CREDITO" ${g.formaPago==='CREDITO'?'selected':''}>Crédito</option></select></div><div class="form-field"><label>Estado</label><select id="g-status"><option value="SALDADO" ${(g.statusGasto||'SALDADO')==='SALDADO'?'selected':''}>Saldado</option><option value="ABONADO" ${g.statusGasto==='ABONADO'?'selected':''}>Abonado</option><option value="PENDIENTE" ${g.statusGasto==='PENDIENTE'?'selected':''}>Pendiente</option></select></div></div>
+  const bcs=DB.config.bancoCuentas||[];
+  const monedaAct=g.moneda||'RD$';
+  const bancoAct=g.banco||'';
+  const bancoOpts=bcs.map(b=>`<option value="${escHtml(b.banco)}" ${b.banco===bancoAct?'selected':''}>${escHtml(b.banco)}</option>`).join('');
+  const bancoSel=bcs.find(b=>b.banco===bancoAct)||bcs[0];
+  const cuentaOpts=(bancoSel?.cuentas||[]).map(c=>{const v=c.tipo+' — '+c.numero;return`<option value="${escHtml(v)}" ${v===g.cuenta?'selected':''}>${escHtml(c.tipo)} — ${escHtml(c.numero)}</option>`;}).join('');
+  openModal('✏️ Editar Gasto de Empresa',`
+    <div class="form-row c2">
+      <div class="form-field"><label>Fecha</label><input type="date" id="g-fecha" value="${g.fecha||today()}"></div>
+      <div class="form-field"><label>Categoría</label><select id="g-cat">${catList.map(c=>`<option ${c===g.categoria?'selected':''}>${c}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-row c2">
+      <div class="form-field"><label>Suplidor</label><select id="g-sup"><option value="">Sin suplidor</option>${DB.suplidores.map(s=>`<option ${s.nombre===g.suplidor?'selected':''}>${escHtml(s.nombre)}</option>`).join('')}</select></div>
+      <div class="form-field"><label>Monto</label><input type="text" id="g-monto" value="${fmtMoneyDisplay(g.monto||0)}" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)"></div>
+    </div>
+    <div class="form-row c3">
+      <div class="form-field"><label>Moneda</label><select id="g-moneda"><option value="RD$" ${monedaAct==='RD$'?'selected':''}>RD$</option><option value="USD" ${monedaAct==='USD'?'selected':''}>USD</option></select></div>
+      <div class="form-field"><label>Banco</label><select id="g-banco" onchange="filtrarCuentasPorBanco('g')">${bancoOpts}</select></div>
+      <div class="form-field"><label>Cuenta</label><select id="g-cuenta">${cuentaOpts}</select></div>
+    </div>
+    <div class="form-row c2">
+      <div class="form-field"><label>Forma de Pago</label><select id="g-forma"><option value="CONTADO" ${(g.formaPago||'CONTADO')==='CONTADO'?'selected':''}>Contado</option><option value="CREDITO" ${g.formaPago==='CREDITO'?'selected':''}>Crédito</option></select></div>
+      <div class="form-field"><label>Estado</label><select id="g-status"><option value="SALDADO" ${(g.statusGasto||'SALDADO')==='SALDADO'?'selected':''}>Saldado</option><option value="ABONADO" ${g.statusGasto==='ABONADO'?'selected':''}>Abonado</option><option value="PENDIENTE" ${g.statusGasto==='PENDIENTE'?'selected':''}>Pendiente</option></select></div>
+    </div>
     <div class="form-field"><label>Descripción</label><input type="text" id="g-desc" value="${escHtml(g.descripcion||'')}"></div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="guardarEditGasto(${i})">💾 Guardar</button>`);
 }
 function guardarEditGasto(i){
+  const _gAntes=DB.gastos[i];
+  const montoAntes=parseFloat(_gAntes.montoAbonado||_gAntes.monto||0);
+  const fechaAntes=_gAntes.fecha||'';
+  const formaAntes=_gAntes.formaPago||'CONTADO';
+  const nuevaForma=document.getElementById('g-forma').value;
+  const nuevoMonto=parseMoney(document.getElementById('g-monto').value);
+  const nuevoBanco=normalizarBancoGlobal(document.getElementById('g-banco')?.value||_gAntes.banco||'');
+  const nuevaCuenta=limpiarCuenta(document.getElementById('g-cuenta')?.value||_gAntes.cuenta||'');
+  const nuevaMoneda=document.getElementById('g-moneda')?.value||_gAntes.moneda||'RD$';
+  // Remove old caja movement
+  const eraContado=['CONTADO','TRANSFERENCIA','CHEQUE'].includes(formaAntes);
+  if(eraContado&&montoAntes>0){
+    DB.caja=DB.caja.filter(c=>!(c.categoria==='Gasto de Empresa'&&c.fecha===fechaAntes&&Math.abs(parseFloat(c.monto||0)-montoAntes)<0.01));
+    sDB('caja');
+  }
   DB.gastos[i].fecha=document.getElementById('g-fecha').value;
   DB.gastos[i].categoria=document.getElementById('g-cat').value;
   DB.gastos[i].suplidor=document.getElementById('g-sup').value;
-  DB.gastos[i].monto=parseMoney(document.getElementById('g-monto').value);
-  DB.gastos[i].formaPago=document.getElementById('g-forma').value;
+  DB.gastos[i].monto=nuevoMonto;
+  DB.gastos[i].formaPago=nuevaForma;
   DB.gastos[i].statusGasto=document.getElementById('g-status').value;
   DB.gastos[i].descripcion=document.getElementById('g-desc').value;
+  DB.gastos[i].banco=nuevoBanco;
+  DB.gastos[i].cuenta=nuevaCuenta;
+  DB.gastos[i].moneda=nuevaMoneda;
+  // Add new caja movement if applicable
+  const esContado=['CONTADO','TRANSFERENCIA','CHEQUE'].includes(nuevaForma);
+  if(esContado&&nuevoMonto>0){
+    DB.caja.push({id:uid(),fecha:DB.gastos[i].fecha,tipo:'SALIDA',categoria:'Gasto de Empresa',
+      descripcion:'Gasto: '+DB.gastos[i].descripcion,monto:nuevoMonto,moneda:nuevaMoneda,
+      banco:nuevoBanco,cuenta:nuevaCuenta,
+      referencia:nuevoBanco&&nuevaCuenta?nuevoBanco+' / '+nuevaCuenta:nuevaCuenta,
+      responsable:currentUser?.nombre||''});
+    sDB('caja');refreshCajaIfActive();
+  }
   logBit('gastos','Editó gasto empresa','');sDB('gastos');closeModal();toast('Gasto actualizado ✓','success');renderGastos();
 }
 function imprimirGastos(){
@@ -7914,6 +7980,15 @@ function confirmarEliminarVenta(id){
     // Eliminar CxC asociada
     DB.cxc=DB.cxc.filter(x=>x.ventaId!==id);sDB('cxc');
   }
+  // Eliminar movimientos de caja asociados a la venta
+  if(v){
+    const nf=v.factura||'';
+    DB.caja=DB.caja.filter(c=>!(
+      (c.categoria==='Venta de Vehículo'||c.categoria==='Cobro de Venta'||c.categoria==='Vehículo Recibido como P/Pago')&&
+      (nf&&(c.descripcion||'').includes(nf)||(c.referencia||'')=== nf)
+    ));
+    sDB('caja');refreshCajaIfActive();
+  }
   DB.ventas=DB.ventas.filter(x=>x.id!==id);
   logBit('ventas','Eliminó venta',v?.factura||'');sDB('ventas');closeModal();toast('Venta eliminada','success');renderVentas();
 }
@@ -8498,6 +8573,15 @@ function confirmarEliminarVenta(id){
     if(vi>=0){DB.vehiculos[vi].status='ACTIVO';DB.vehiculos[vi].fechaVenta='';DB.vehiculos[vi].precioVentaFinal=0;sDB('vehiculos');}
     // Eliminar CxC asociada
     DB.cxc=DB.cxc.filter(x=>x.ventaId!==id);sDB('cxc');
+  }
+  // Eliminar movimientos de caja asociados a la venta
+  if(v){
+    const nf=v.factura||'';
+    DB.caja=DB.caja.filter(c=>!(
+      (c.categoria==='Venta de Vehículo'||c.categoria==='Cobro de Venta'||c.categoria==='Vehículo Recibido como P/Pago')&&
+      (nf&&(c.descripcion||'').includes(nf)||(c.referencia||'')=== nf)
+    ));
+    sDB('caja');refreshCajaIfActive();
   }
   DB.ventas=DB.ventas.filter(x=>x.id!==id);
   logBit('ventas','Eliminó venta',v?.factura||'');sDB('ventas');closeModal();toast('Venta eliminada','success');renderVentas();
@@ -11149,7 +11233,7 @@ function cxcAccion(accion){
     const x=DB.cxc.find(c=>c.id===cxcSelectedId);
     openModal('🗑 Eliminar CxC',`<p>¿Eliminar la cuenta de <strong>${escHtml(x?.cliente||'')}</strong>?</p>`,
       `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-       <button class="btn btn-red" onclick="DB.cxc=DB.cxc.filter(c=>c.id!=='${cxcSelectedId}');sDB('cxc');closeModal();toast('Eliminado','success');renderCXC()">🗑 Eliminar</button>`);
+       <button class="btn btn-red" onclick="const _cxcD=DB.cxc.find(c=>c.id==='${cxcSelectedId}');if(_cxcD){const _cxcAbono=parseFloat(_cxcD.abonado||0);if(_cxcAbono>0){DB.caja=DB.caja.filter(c=>!(c.categoria==='CxC Manual'&&Math.abs(parseFloat(c.monto||0)-_cxcAbono)<0.01&&c.fecha===_cxcD.fecha));sDB('caja');refreshCajaIfActive();}}DB.cxc=DB.cxc.filter(c=>c.id!=='${cxcSelectedId}');sDB('cxc');closeModal();toast('Eliminado','success');renderCXC()">🗑 Eliminar</button>`);
   }
 }
 
@@ -12406,7 +12490,7 @@ function eliminarSeguro(id){
   if(currentUser?.role!=='admin'&&!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}
   openModal('🗑 Eliminar Seguro','<p>¿Eliminar este seguro?</p>',
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-     <button class="btn btn-red" onclick="DB.seguros=DB.seguros.filter(x=>x.id!=='${id}');sDB('seguros');closeModal();toast('Eliminado','success');renderSeguros()">🗑 Eliminar</button>`);
+     <button class="btn btn-red" onclick="const _segD=(DB.seguros||[]).find(x=>x.id==='${id}');if(_segD&&parseFloat(_segD.abonado||0)>0){DB.caja=DB.caja.filter(c=>!((c.categoria==='Seguro Vehículo'||c.categoria==='Cobro Seguro (Cliente)')&&(c.descripcion||'').includes(escHtml(_segD.compania||''))));sDB('caja');refreshCajaIfActive();}DB.seguros=DB.seguros.filter(x=>x.id!=='${id}');sDB('seguros');closeModal();toast('Eliminado','success');renderSeguros()">🗑 Eliminar</button>`);
 }
 
 // ══ FACTURA EXTERNA ══
@@ -12436,7 +12520,7 @@ function renderFacturaExterna(){
               <button class="btn btn-sm btn-primary tooltip-btn" title="Imprimir con encabezado" onclick="imprimirFacturaExterna('${f.id}',true)">🖨️</button>
               <button class="btn btn-sm btn-secondary tooltip-btn" title="Imprimir sin encabezado" onclick="imprimirFacturaExterna('${f.id}',false)" style="font-size:11px">📄</button>
               <button class="btn btn-sm btn-amber tooltip-btn" title="Editar" onclick="editarFacturaExterna(${realIdx})">✏️</button>
-              ${currentUser?.role==='admin'?`<button class="btn btn-sm btn-red tooltip-btn" title="Eliminar" onclick="if(confirm('¿Eliminar esta factura?')){DB.facturasExternas.splice(${realIdx},1);sDB('facturasExternas');toast('Eliminado','success');renderFacturaExterna()}">🗑</button>`:''}
+              ${currentUser?.role==='admin'?`<button class="btn btn-sm btn-red tooltip-btn" title="Eliminar" onclick="if(confirm('¿Eliminar esta factura?')){const _feD=DB.facturasExternas[${realIdx}];if(_feD&&parseFloat(_feD.abono||0)>0){const _feM=parseFloat(_feD.abono||0);DB.caja=DB.caja.filter(c=>(c.categoria!=='Factura Externa'||Math.abs(parseFloat(c.monto||0)-_feM)>=0.01));sDB('caja');refreshCajaIfActive();}DB.facturasExternas.splice(${realIdx},1);sDB('facturasExternas');toast('Eliminado','success');renderFacturaExterna()}">🗑</button>`:''}
             </div>
           </td>
         </tr>`}).join(''):'<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--gray)">Sin facturas externas registradas</td></tr>'}

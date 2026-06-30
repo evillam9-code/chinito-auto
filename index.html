@@ -3331,7 +3331,7 @@ function renderCaja(){
     </div>
 
     <!-- BARRA ACUMULADA TOTAL -->
-    ${(currentUser?.role==='admin'||(currentUser?.modulos||[]).includes('verSaldoCaja'))?`
+
     <div style="background:var(--navy);border-radius:14px;padding:20px 24px;margin-bottom:14px">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;letter-spacing:.8px;margin-bottom:14px">
         💰 ${vista==='ACUMULADO'?'SALDO ACUMULADO — TODAS LAS CUENTAS':'SALDO DEL MES: '+mes}
@@ -3401,8 +3401,8 @@ function renderCaja(){
 
     <!-- Tarjetas por banco/cuenta -->
     ${bancoCards}
-    `:''}<!-- fin verSaldoCaja -->
-    ${(currentUser?.role==='admin'||(currentUser?.modulos||[]).includes('verSaldoCaja'))?`
+
+
     <div class="card" style="background:var(--navy);margin-bottom:16px">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:10px;text-align:center">📅 Resumen del mes seleccionado</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center">
@@ -3411,7 +3411,7 @@ function renderCaja(){
         <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:4px">Balance RD$</div><div style="font-size:18px;font-weight:800;color:${balRD>=0?'#4ade80':'#f87171'}">${fmt(balRD)}</div></div>
         <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:4px">Balance USD</div><div style="font-size:18px;font-weight:800;color:${balUSD>=0?'#4ade80':'#f87171'}">${fmtUSD(balUSD)}</div></div>
       </div>
-    </div>`:''}
+    </div>
     <div class="card">
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <select id="caja-tab" onchange="renderCaja()" style="padding:7px 12px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px">

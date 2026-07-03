@@ -11031,6 +11031,7 @@ function renderCXC(){
         </select>
         <div style="width:1px;height:28px;background:var(--gray3);margin:0 2px"></div>
         <button id="cxc-btn-cobrar" disabled class="btn btn-sm" style="${ds}" onclick="cxcAccion('cobrar')">💵 Registrar Cobro</button>
+        ${(currentUser?.role==='admin'||canDo('editar'))?`<button id="cxc-btn-editar" disabled class="btn btn-sm" style="${ds}" onclick="cxcAccion('editar')">✏️ Editar</button>`:''}
         <button id="cxc-btn-historial" disabled class="btn btn-sm" style="${ds}" onclick="cxcAccion('historial')">👁 Historial</button>
         ${(currentUser?.role==='admin'||canDo('eliminar'))?`<button id="cxc-btn-eliminar" disabled class="btn btn-sm" style="${ds}" onclick="cxcAccion('eliminar')">🗑 Eliminar</button>`:''}
         <div style="width:1px;height:28px;background:var(--gray3);margin:0 2px"></div>
@@ -11100,6 +11101,7 @@ function selCXC(id,tr){
   const x=DB.cxc.find(c=>c.id===id);
   const actB=(bid,bg,c)=>{const b=document.getElementById(bid);if(b){b.disabled=false;b.style.cssText='background:'+bg+';color:'+c+';cursor:pointer;border:none;';}};
   if(x?.status!=='SALDADO')actB('cxc-btn-cobrar','#16a34a','#fff');
+  if(currentUser?.role==='admin'||canDo('editar'))actB('cxc-btn-editar','#2563eb','#fff');
   actB('cxc-btn-historial','#475569','#fff');
   if(currentUser?.role==='admin'||canDo('eliminar'))actB('cxc-btn-eliminar','#dc2626','#fff');
 }
@@ -11224,9 +11226,88 @@ function guardarCXCManual(){
   refreshCajaIfActive();
   toast('Cuenta por cobrar creada ✓','success');renderCXC();
 }
+
+function editarCXC(id){
+  const x=DB.cxc.find(c=>c.id===id);if(!x)return;
+  const esUSD=(x.moneda||'RD$')==='USD';
+  openModal('✏️ Editar Cuenta por Cobrar'+(x.status==='SALDADO'?' <span style="font-size:11px;color:#16a34a;font-weight:700">(SALDADA)</span>':''),`
+    ${x.status==='SALDADO'?`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#92400e">ℹ️ Esta cuenta ya está <strong>saldada</strong>. Puedes corregir un dato incorrecto (cliente, monto, fecha, concepto), pero recuerda que el historial de pagos ya realizados no se modifica aquí.</div>`:''}
+    <div class="form-row c2">
+      <div class="form-field"><label class="required">Cliente</label>
+        <select id="ecxc-cli">
+          ${DB.clientes.map(cl=>`<option value="${cl.id}" ${cl.id===x.clienteId?'selected':''}>${escHtml(cl.nombre)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-field"><label class="required">Fecha</label>
+        <input type="date" id="ecxc-fecha" value="${x.fecha||today()}">
+      </div>
+    </div>
+    <div class="form-row c2">
+      <div class="form-field"><label class="required">Concepto</label>
+        <input type="text" id="ecxc-concepto" value="${escHtml(x.concepto||'')}" placeholder="Ej: Servicio, préstamo, etc.">
+      </div>
+      <div class="form-field"><label>Fecha Límite</label>
+        <input type="date" id="ecxc-vence" value="${x.fechaVence||''}">
+      </div>
+    </div>
+    <div class="form-row c3">
+      <div class="form-field"><label class="required">Monto Total</label>
+        <input type="text" id="ecxc-total" value="${fmtMoneyDisplay(x.total||0)}" oninput="fmtMoneyInput(this);calcSaldoEditCXC()" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)">
+      </div>
+      <div class="form-field"><label>Abonado hasta ahora</label>
+        <input type="text" id="ecxc-abonado" value="${fmtMoneyDisplay(x.abonado||0)}" oninput="fmtMoneyInput(this);calcSaldoEditCXC()" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)">
+      </div>
+      <div class="form-field"><label>Saldo Pendiente</label>
+        <input type="text" id="ecxc-saldo" readonly value="${fmtMoneyDisplay(x.saldo||0)}" style="background:#f1f5f9;font-weight:700;color:var(--red)">
+      </div>
+    </div>
+    <div class="form-field"><label>Moneda</label>
+      <select id="ecxc-moneda">
+        <option value="RD$" ${!esUSD?'selected':''}>RD$ — Pesos</option>
+        <option value="USD" ${esUSD?'selected':''}>USD — Dólares</option>
+      </select>
+    </div>
+    <div style="font-size:11px;color:var(--gray);margin-top:6px">Nota: al corregir "Abonado", el sistema recalcula el saldo y el estado (Pendiente / Parcial / Saldado). El historial de pagos individuales (👁 Historial) no se altera con este formulario.</div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+     <button class="btn btn-primary" onclick="guardarEdicionCXC('${id}')">💾 Guardar Cambios</button>`);
+}
+function calcSaldoEditCXC(){
+  const total=parseMoney(document.getElementById('ecxc-total')?.value);
+  const abonado=parseMoney(document.getElementById('ecxc-abonado')?.value);
+  const saldo=document.getElementById('ecxc-saldo');
+  if(saldo)saldo.value=fmtMoneyDisplay(Math.max(0,total-abonado));
+}
+function guardarEdicionCXC(id){
+  const i=DB.cxc.findIndex(c=>c.id===id);if(i<0)return;
+  const cliId=document.getElementById('ecxc-cli').value;
+  const concepto=document.getElementById('ecxc-concepto').value.trim();
+  const total=parseMoney(document.getElementById('ecxc-total').value);
+  if(!cliId){toast('Selecciona un cliente','error');return;}
+  if(!concepto){toast('Ingresa el concepto','error');return;}
+  if(!total){toast('Ingresa el monto total','error');return;}
+  const cli=DB.clientes.find(x=>x.id===cliId);
+  const abonado=parseMoney(document.getElementById('ecxc-abonado').value);
+  const saldo=Math.max(0,total-abonado);
+  DB.cxc[i].clienteId=cliId;
+  DB.cxc[i].cliente=cli?.nombre||DB.cxc[i].cliente;
+  DB.cxc[i].concepto=concepto;
+  DB.cxc[i].fecha=document.getElementById('ecxc-fecha').value||DB.cxc[i].fecha;
+  DB.cxc[i].fechaVence=document.getElementById('ecxc-vence').value||'';
+  DB.cxc[i].total=total;
+  DB.cxc[i].abonado=abonado;
+  DB.cxc[i].saldo=saldo;
+  DB.cxc[i].moneda=document.getElementById('ecxc-moneda').value;
+  DB.cxc[i].status=saldo<=0?'SALDADO':abonado>0?'PARCIAL':'PENDIENTE';
+  sDB('cxc');
+  closeModal();
+  toast('Cuenta por cobrar actualizada ✓','success');
+  renderCXC();
+}
+
 function cxcAccion(accion){
   if(!cxcSelectedId)return;
   if(accion==='cobrar'){if(!canDo('editar')){toast('No tienes permiso para registrar cobros','error');return;}abonarCXC(cxcSelectedId);}
+  else if(accion==='editar'){if(!canDo('editar')){toast('No tienes permiso para editar','error');return;}editarCXC(cxcSelectedId);}
   else if(accion==='historial')verAbonosCXC(cxcSelectedId);
   else if(accion==='eliminar'){
     if(!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}
@@ -11294,8 +11375,11 @@ function confirmarAbonarCXC(id){
   if(DB.cxc[i].ventaId){
     const vi=DB.ventas.findIndex(v=>v.id===DB.cxc[i].ventaId);
     if(vi>=0){
+      // Nota: el abono se registra como pago en la CxC (pagos[]) y en caja.
+      // No se modifica el monto "inicial" de la factura/venta original — la factura
+      // de venta permanece intacta; solo se actualiza el saldo pendiente para reflejar
+      // el estado real de cobro.
       DB.ventas[vi].pendiente=DB.cxc[i].saldo;
-      DB.ventas[vi].inicial=(DB.ventas[vi].inicial||0)+monto;
       if(saldado){if(DB.ventas[vi].fechaEntrega){DB.ventas[vi].estadoVenta='VENDIDO';}else{DB.ventas[vi].estadoVenta='TRÁNSITO';}DB.ventas[vi].docsPendientes=!DB.ventas[vi].fechaEntrega;}
       sDB('ventas');
     }
@@ -11391,114 +11475,258 @@ function imprimirReciboCobro(cxc, pago){
   const logo=DB.config.logoData||DB.config.logo||'';
   const esSaldado=pago.saldado;
   const ventaRel=DB.ventas.find(v=>v.id===cxc.ventaId);
+  const cli=DB.clientes.find(c=>c.id===cxc.clienteId);
   const esUSD=(cxc.moneda||ventaRel?.moneda||'RD$')==='USD';
-  const fV=(n)=>esUSD?'$'+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2})+' USD':fmt(n);
-  const empresa=DB.config.empresa||'DealerSystem';
-  const titulo=`${esSaldado?'Recibo de Saldo':'Recibo de Abono'} — ${escHtml(cxc.factura||'')} — ${escHtml(cxc.cliente||'')} — ${escHtml(cxc.vehiculo||'')}`;
-  const win=window.open('','_blank','width=720,height=650');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>${titulo}</title>
+  const fV=(n)=>esUSD?'USD $'+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2}):'RD$ '+parseFloat(n||0).toLocaleString('es-DO',{minimumFractionDigits:2});
+  const empresa=DB.config.empresa||'CHINITO AUTO IMPORT';
+  const direccion=DB.config.direccion||'Autopista Duarte, Km 9½, Puñal Arenoso, Santiago, Rep. Dom.';
+  const telefono=DB.config.telefono||'';
+  const telefono2=DB.config.telefono2||'';
+  const rnc=DB.config.rnc||'';
+  // Título del documento: si con este pago la cuenta queda saldada, se emite como
+  // "Factura Saldada"; si aún queda pendiente, se emite como "Factura Abono de Pago".
+  const docTitulo=esSaldado?'Factura Saldada':'Factura Abono de Pago';
+  const saldoAnterior=(cxc.abonado||0)-pago.monto>=0?(parseFloat(cxc.total||0)-((cxc.abonado||0)-pago.monto)):parseFloat(cxc.total||0);
+  const fechaLarga=(()=>{try{const d=new Date((pago.fecha||'')+'T12:00:00');const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];return d.getDate()+' de '+meses[d.getMonth()]+' de '+d.getFullYear();}catch{return fmtDate(pago.fecha);}})();
+  const titulo=`${docTitulo} — ${escHtml(cxc.factura||'')} — ${escHtml(cxc.cliente||'')}`;
+  const win=window.open('','_blank','width=860,height=800');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#0f172a}
-    .page{max-width:620px;margin:0 auto;padding:28px}
-    .hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:4px solid ${esSaldado?'#16a34a':'#d97706'};margin-bottom:18px}
-    .logo-box{width:54px;height:54px;background:#2563eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0}
-    .emp{margin-left:12px}.emp-nombre{font-size:17px;font-weight:900}
-    .emp-sub{font-size:10px;color:#6b7280;margin-top:2px}
-    .tipo-recibo{font-size:15px;font-weight:900;text-transform:uppercase;color:${esSaldado?'#16a34a':'#d97706'}}
-    .badge-tipo{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:800;background:${esSaldado?'#dcfce7':'#fef3c7'};color:${esSaldado?'#16a34a':'#d97706'};margin-top:6px}
-    .sec{margin-bottom:14px}
-    .sec-titulo{font-size:10px;font-weight:800;text-transform:uppercase;color:#fff;background:#0f172a;padding:4px 10px;border-radius:4px;margin-bottom:8px;display:inline-block}
-    .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .campo label{font-size:9px;font-weight:700;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:2px}
-    .campo span{font-size:12px;font-weight:600;display:block;padding:5px 8px;background:#f8fafc;border-radius:4px;border-left:3px solid #2563eb}
-    .resumen{background:#f8fafc;border-radius:8px;padding:14px;border:1px solid #e2e8f0}
-    .resumen-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0;font-size:12px}
-    .monto-cobro{background:${esSaldado?'#dcfce7':'#fef3c7'};border-radius:6px;padding:10px 14px;display:flex;justify-content:space-between;font-size:15px;font-weight:900;color:${esSaldado?'#16a34a':'#d97706'};margin-top:8px}
-    .saldo-box{margin-top:8px;padding:8px 14px;border-radius:6px;display:flex;justify-content:space-between;font-weight:700;background:${esSaldado?'#dcfce7':'#fee2e2'};color:${esSaldado?'#16a34a':'#dc2626'}}
-    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:36px}
-    .firma-linea{border-top:1px solid #000;padding-top:5px;text-align:center;font-size:10px;color:#475569}
-    .firma-nombre{font-size:12px;font-weight:700;color:#0f172a;margin-top:2px}
-    .pie{text-align:center;font-size:9px;color:#94a3b8;margin-top:20px;padding-top:10px;border-top:1px solid #e2e8f0}
-    @media print{.noprint{display:none}body{padding:0}.page{padding:20px}}
+    body{font-family:'Outfit',Arial,sans-serif;font-size:11px;color:#0f172a;background:#fff}
+    .page{max-width:680px;margin:0 auto;padding:20px 28px 16px;display:flex;flex-direction:column;min-height:55vh}
+    .hdr{text-align:center;border-bottom:3px solid #083a70;padding-bottom:8px;margin-bottom:46px}
+    .hdr-logo{max-width:340px;max-height:140px;object-fit:contain;display:block;margin:0 auto 4px}
+    .hdr-empresa-sub{font-size:9px;color:#4a5568;line-height:1.5;text-align:center;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
+    .hdr-doc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:8px;border-bottom:1px solid #d1dbe8}
+    .hdr-doc-titulo{flex:1;font-size:19px;font-weight:900;color:${esSaldado?'#16a34a':'#083a70'};text-align:center;letter-spacing:1px;text-transform:uppercase;font-family:'Outfit',Arial,sans-serif}
+    .hdr-doc-nro{font-size:11px;font-weight:700;color:#083a70;text-align:right;font-family:'Outfit',Arial,sans-serif}
+    .hdr-doc-fecha{font-size:10px;color:#64748b;margin-top:1px;text-align:right;font-family:'Outfit',Arial,sans-serif}
+    .sec{margin-bottom:20px}
+    .sec-titulo{font-size:10.5px;font-weight:800;color:#fff;background:#1a56a0;padding:3px 9px;border-radius:3px;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;font-family:'Outfit',Arial,sans-serif}
+    .cli-line{font-size:11px;line-height:1.6;font-family:'Outfit',Arial,sans-serif}
+    .cli-line b{font-weight:700;color:#083a70}
+    .cli-line span{text-transform:uppercase;font-weight:500}
+    .fin-wrap{display:flex;justify-content:flex-end;margin-bottom:39px;margin-top:60px}
+    .fin-tabla{width:300px;border-collapse:collapse;font-size:11px;font-family:'Outfit',Arial,sans-serif}
+    .fin-tabla td{padding:4px 6px;font-family:'Outfit',Arial,sans-serif}
+    .fin-tabla .lbl{color:#4b5563;font-weight:500}
+    .fin-tabla .val{text-align:right;font-weight:700}
+    .fin-inicial td{color:#4b5563;font-weight:500}
+    .fin-inicial .val{color:#16a34a;font-weight:700}
+    .fin-pend{border-top:2px solid #a32d2d;border-bottom:2px solid #a32d2d}
+    .fin-pend td{padding-top:5px;padding-bottom:5px;color:#a32d2d;font-weight:800;font-size:12.5px}
+    .fin-saldada{border-top:2px solid #16a34a;border-bottom:2px solid #16a34a}
+    .fin-saldada td{padding-top:5px;padding-bottom:5px;color:#16a34a;font-weight:800;font-size:12.5px}
+    .fin-total{background:#083a70}
+    .fin-total td{padding-top:5px;padding-bottom:5px;font-weight:800;color:#fff;font-size:11.5px}
+    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:auto;margin-bottom:38px;padding-top:0px}
+    .firma-item{text-align:center}
+    .firma-espacio{height:0px}
+    .firma-linea{border-top:1.5px solid #0f172a;padding-top:4px;font-family:'Outfit',Arial,sans-serif}
+    .firma-sub{color:#083a70;font-size:10px;margin-top:1px;text-transform:uppercase;font-weight:700;letter-spacing:.5px}
+    .gracias-box{border-top:0.5px solid #cbd5e1;padding-top:8px;text-align:center}
+    .gracias-text{font-size:12px;font-weight:800;color:#083a70;text-transform:uppercase;letter-spacing:2px;font-family:'Outfit',Arial,sans-serif}
+    @media print{
+      .np{display:none}
+      html,body{height:100%}
+      body{padding:0}
+      .page{padding:6px 12px;min-height:100vh}
+      @page{size:letter portrait;margin:5mm}
+    }
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
   </style></head><body><div class="page">
+
   <div class="hdr">
-    <div style="display:flex;align-items:center">
-      ${logo?`<img src="${logo}" style="width:54px;height:54px;object-fit:contain;border-radius:8px">`:`<div class="logo-box">${escHtml(empresa[0])}</div>`}
-      <div class="emp">
-        <div class="emp-nombre">${escHtml(empresa)}</div>
-        <div class="emp-sub">Venta de Vehículos</div>
-        ${DB.config.telefono?`<div class="emp-sub">Tel: ${escHtml(DB.config.telefono)}</div>`:''}
-        ${DB.config.rnc?`<div class="emp-sub">RNC: ${escHtml(DB.config.rnc)}</div>`:''}
-      </div>
-    </div>
-    <div style="text-align:right">
-      <div class="tipo-recibo">${esSaldado?'Recibo de Saldo':'Recibo de Abono'}</div>
-      <div style="font-size:11px;font-family:monospace;font-weight:700;color:#2563eb;margin-top:4px">${escHtml(cxc.factura||'')}</div>
-      <div style="font-size:11px;color:#6b7280;margin-top:2px">Fecha: ${fmtDate(pago.fecha)}</div>
-      <div class="badge-tipo">${esSaldado?'✅ CUENTA SALDADA':'💵 ABONO PARCIAL'}</div>
+    ${logo?`<img src="${logo}" class="hdr-logo" alt="Logo">`:`<div style="font-size:22px;font-weight:900;color:#083a70;letter-spacing:2px;margin-bottom:5px;font-family:'Outfit',Arial,sans-serif">${escHtml(empresa)}</div>`}
+    <div class="hdr-empresa-sub">
+      ${escHtml(direccion)}<br>
+      ${telefono?'Tel: '+escHtml(telefono):''}${telefono2?' &nbsp;·&nbsp; '+escHtml(telefono2):''}${rnc?' &nbsp;·&nbsp; RNC: '+escHtml(rnc):''}
     </div>
   </div>
+
+  <div class="hdr-doc-row">
+    <div style="min-width:120px"></div>
+    <div class="hdr-doc-titulo">${docTitulo}</div>
+    <div style="text-align:right;min-width:120px">
+      <div class="hdr-doc-nro">N.º ${escHtml(cxc.factura||'')}</div>
+      <div class="hdr-doc-fecha">${fechaLarga}</div>
+    </div>
+  </div>
+
   <div class="sec">
-    <div class="sec-titulo">👤 Datos del Cliente</div>
-    <div class="g2">
-      <div class="campo"><label>Nombre</label><span>${escHtml(cxc.cliente||'—')}</span></div>
-      <div class="campo"><label>Vehículo</label><span>${escHtml(cxc.vehiculo||'—')}</span></div>
+    <div class="sec-titulo">Datos del Cliente</div>
+    <div class="cli-line">
+      <div><b>Nombre:</b> <span>${escHtml((cli?.nombre||cxc.cliente||'—').toUpperCase())}</span></div>
+      ${cli?.documento?`<div><b>Cédula / RNC:</b> <span>${escHtml(cli.documento)}</span></div>`:''}
+      ${cxc.vehiculo?`<div><b>Vehículo:</b> <span>${escHtml(cxc.vehiculo.toUpperCase())}</span></div>`:''}
+      <div><b>Concepto:</b> <span>${escHtml((cxc.concepto||'—').toUpperCase())}</span></div>
+      ${pago.cuenta?`<div><b>Cuenta de Ingreso:</b> <span>${escHtml(pago.cuenta)}</span></div>`:''}
+      ${pago.nota?`<div><b>Nota:</b> <span style="text-transform:none">${escHtml(pago.nota)}</span></div>`:''}
     </div>
   </div>
-  <div class="sec">
-    <div class="sec-titulo">💰 Detalle del Cobro</div>
-    <div class="resumen">
-      <div class="resumen-row"><span>Total de la Venta</span><span style="font-weight:700">${fV(cxc.total||0)}</span></div>
-      <div class="resumen-row"><span>Cobrado Anteriormente</span><span style="color:#16a34a">${fV((cxc.abonado||0)-pago.monto)}</span></div>
-      <div class="monto-cobro"><span>${esSaldado?'Pago Final Recibido':'Abono Recibido'}</span><span>${fV(pago.monto)}</span></div>
-      <div class="resumen-row"><span>💳 Cuenta de Ingreso</span><span style="font-weight:700;color:#2563eb">${escHtml(pago.cuenta||'—')}</span></div>
-      <div class="saldo-box"><span>${esSaldado?'✅ Cuenta Saldada':'⏳ Saldo Pendiente'}</span><span>${fV(cxc.saldo||0)}</span></div>
-      ${!esSaldado&&esUSD?`<div style="font-size:10px;color:#94a3b8;margin-top:4px;text-align:right">Equivalente: RD$ ${fmt((cxc.saldo||0)*tasa)}</div>`:''}
-    </div>
-    ${pago.nota?`<div style="margin-top:8px;font-size:11px;background:#f1f5f9;border-radius:4px;padding:6px 10px;color:#475569">📝 ${escHtml(pago.nota)}</div>`:''}
+
+  <div class="fin-wrap">
+    <table class="fin-tabla">
+      <tr class="fin-inicial"><td class="lbl">Saldo Pendiente Anterior</td><td class="val" style="color:#4b5563">${fV(saldoAnterior)}</td></tr>
+      <tr class="fin-inicial"><td class="lbl">Abono / Pago Realizado</td><td class="val">${fV(pago.monto)}</td></tr>
+      <tr class="${esSaldado?'fin-saldada':'fin-pend'}"><td>${esSaldado?'Cuenta Saldada':'Saldo Pendiente'}</td><td class="val" style="text-align:right">${fV(cxc.saldo||0)}</td></tr>
+      <tr class="fin-total"><td>Total de la Factura</td><td style="text-align:right;font-weight:800;color:#fff">${fV(cxc.total||0)}</td></tr>
+    </table>
   </div>
+
   <div class="firmas">
-    <div style="text-align:center"><div style="height:40px"></div>
-      <div class="firma-linea"><div class="firma-nombre">${escHtml(cxc.cliente||'Cliente')}</div>Firma del Cliente</div>
+    <div class="firma-item">
+      <div class="firma-espacio"></div>
+      <div class="firma-linea"><div class="firma-sub">Recibido Por</div></div>
     </div>
-    <div style="text-align:center"><div style="height:40px"></div>
-      <div class="firma-linea"><div class="firma-nombre">${escHtml(DB.config.responsable||empresa)}</div>Firma Autorizada</div>
+    <div class="firma-item">
+      <div class="firma-espacio"></div>
+      <div class="firma-linea"><div class="firma-sub">Atendido Por</div></div>
     </div>
   </div>
-  <div class="pie">Documento generado el ${fmtDate(today())} &nbsp;|&nbsp; ${escHtml(empresa)}</div>
-  <div class="noprint" style="margin-top:20px;text-align:center">
-    <button onclick="window.print()" style="padding:9px 24px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700">🖨️ Imprimir / Guardar PDF</button>
+
+  <div class="gracias-box">
+    <div class="gracias-text">¡Gracias por Confiar en Nosotros!</div>
   </div>
+
+  <div class="np" style="margin-top:24px;text-align:center">
+    <button onclick="window.print()" style="padding:10px 30px;background:#083a70;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:'Outfit',Arial,sans-serif;font-weight:700;letter-spacing:.5px">🖨️ Imprimir / Guardar PDF</button>
+  </div>
+
   </div></body></html>`);
   win.document.close();
+  win.onafterprint=()=>{try{win.close();}catch(e){}};
+  win.addEventListener('focus',()=>{window.focus();});
 }
 
 function verAbonosCXC(id){
   const x=DB.cxc.find(c=>c.id===id);if(!x)return;
   const ventaRel=DB.ventas.find(v=>v.id===x.ventaId);
+  const puedeEditar=(currentUser?.role==='admin'||canDo('editar'));
+  const puedeBorrar=(currentUser?.role==='admin'||canDo('eliminar'));
 
   const esUSD=(x.moneda||ventaRel?.moneda||'RD$')==='USD';
   const fV=(n)=>esUSD?'$'+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2})+' USD':fmt(n);
-  const rows=(x.pagos||[]).map((p,pi)=>`<tr>
+  const rows=(x.pagos||[]).map((p,pi)=>{
+    const esUltimoSaldado=x.status==='SALDADO'&&pi===(x.pagos||[]).length-1;
+    const pid=p.id||('idx'+pi);
+    return`<tr>
     <td>${fmtDate(p.fecha)}</td>
     <td style="font-weight:700;color:var(--green)">${fV(p.monto)}</td>
     <td>${escHtml(p.cuenta||'—')}</td>
     <td>${escHtml(p.nota||'—')}</td>
-    <td><span class="badge ${x.status==='SALDADO'&&pi===(x.pagos||[]).length-1?'badge-green':'badge-amber'}">${x.status==='SALDADO'&&pi===(x.pagos||[]).length-1?'SALDADO':'ABONO'}</span></td>
-    <td><button class="btn btn-secondary btn-sm" onclick="imprimirReciboCobro(DB.cxc.find(c=>c.id==='${x.id}'),{fecha:'${p.fecha}',monto:${p.monto},cuenta:'${escHtml(p.cuenta||'')}',nota:'${escHtml(p.nota||'')}',saldado:${x.status==='SALDADO'&&pi===(x.pagos||[]).length-1}})">🖨️</button></td>
-  </tr>`).join('');
+    <td><span class="badge ${esUltimoSaldado?'badge-green':'badge-amber'}">${esUltimoSaldado?'SALDADO':'ABONO'}</span></td>
+    <td style="white-space:nowrap">
+      ${puedeEditar?`<button class="btn btn-secondary btn-sm" title="Editar pago" onclick="editarPagoCXC('${x.id}','${pid}')">✏️</button>`:''}
+      <button class="btn btn-secondary btn-sm" title="Imprimir" onclick="imprimirReciboCobro(DB.cxc.find(c=>c.id==='${x.id}'),{fecha:'${p.fecha}',monto:${p.monto},cuenta:'${escHtml(p.cuenta||'')}',nota:'${escHtml(p.nota||'')}',saldado:${esUltimoSaldado}})">🖨️</button>
+      ${puedeBorrar?`<button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:none" title="Borrar pago" onclick="borrarPagoCXC('${x.id}','${pid}')">🗑️</button>`:''}
+    </td>
+  </tr>`;}).join('');
   openModal('📋 Historial de Cobros — '+escHtml(x.cliente),`
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
       <div style="text-align:center;padding:10px;background:var(--gray2);border-radius:8px"><div style="font-size:10px;color:var(--gray)">Total Venta</div><div style="font-weight:800">${fV(x.total)}</div></div>
       <div style="text-align:center;padding:10px;background:var(--green2);border-radius:8px"><div style="font-size:10px;color:var(--green)">Total Cobrado</div><div style="font-weight:800;color:var(--green)">${fV(x.abonado||0)}</div></div>
       <div style="text-align:center;padding:10px;background:var(--red2);border-radius:8px"><div style="font-size:10px;color:var(--red)">Saldo Pendiente</div><div style="font-weight:800;color:var(--red)">${fV(x.saldo||0)}</div></div>
     </div>
-    <table><thead><tr><th>Fecha</th><th>Monto</th><th>Cuenta Ingreso</th><th>Nota</th><th>Tipo</th><th>Recibo</th></tr></thead>
+    <table><thead><tr><th>Fecha</th><th>Monto</th><th>Cuenta Ingreso</th><th>Nota</th><th>Tipo</th><th>Acciones</th></tr></thead>
     <tbody>${rows||'<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--gray)">Sin cobros registrados</td></tr>'}</tbody></table>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
      <button class="btn btn-primary" onclick="imprimirResumenPagosCXC('${x.id}')">📄 Imprimir Resumen PDF</button>`);
+}
+
+function recalcCXCDesdeCPagos(i){
+  const x=DB.cxc[i];
+  const pagos=x.pagos||[];
+  const abonado=pagos.reduce((a,p)=>a+parseFloat(p.monto||0),0);
+  const saldo=Math.max(0,parseFloat(x.total||0)-abonado);
+  x.abonado=abonado;
+  x.saldo=saldo;
+  x.status=saldo<=0?'SALDADO':abonado>0?'PARCIAL':'PENDIENTE';
+  pagos.forEach((p,pi)=>{p.saldado=(pi===pagos.length-1)&&saldo<=0;});
+  if(x.ventaId){
+    const vi=DB.ventas.findIndex(v=>v.id===x.ventaId);
+    if(vi>=0){DB.ventas[vi].pendiente=saldo;sDB('ventas');}
+  }
+}
+
+function editarPagoCXC(cxcId,pagoId){
+  if(!canDo('editar')){toast('No tienes permiso para editar','error');return;}
+  const x=DB.cxc.find(c=>c.id===cxcId);if(!x)return;
+  const pi=(x.pagos||[]).findIndex((p,idx)=>(p.id||('idx'+idx))===pagoId);if(pi<0)return;
+  const p=x.pagos[pi];
+  const esUSD=(x.moneda||'RD$')==='USD';
+  openModal('✏️ Editar Pago — '+escHtml(x.cliente),`
+    <div class="form-row c2">
+      <div class="form-field"><label class="required">Monto (${esUSD?'USD':'RD$'})</label>
+        <input type="text" id="epago-monto" value="${p.monto}" oninput="fmtMoneyInput(this)" onblur="fmtMoneyBlur(this)" onfocus="fmtMoneyFocus(this)">
+      </div>
+      <div class="form-field"><label class="required">Fecha</label>
+        <input type="date" id="epago-fecha" value="${p.fecha||today()}">
+      </div>
+    </div>
+    <div class="form-row c2">
+      <div class="form-field"><label>Cuenta de Ingreso</label>
+        <input type="text" id="epago-cuenta" value="${escHtml(p.cuenta||'')}">
+      </div>
+      <div class="form-field"><label>Nota</label>
+        <input type="text" id="epago-nota" value="${escHtml(p.nota||'')}">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--gray);margin-top:6px">El total cobrado y el saldo de la cuenta se recalculan automáticamente al guardar. Si este pago tiene un movimiento asociado en Caja, se intentará actualizar también.</div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+     <button class="btn btn-primary" onclick="guardarEdicionPagoCXC('${cxcId}','${pagoId}')">💾 Guardar</button>`);
+}
+
+function guardarEdicionPagoCXC(cxcId,pagoId){
+  const ci=DB.cxc.findIndex(c=>c.id===cxcId);if(ci<0)return;
+  const x=DB.cxc[ci];
+  const pi=(x.pagos||[]).findIndex((p,idx)=>(p.id||('idx'+idx))===pagoId);if(pi<0)return;
+  const monto=parseMoney(document.getElementById('epago-monto').value);
+  if(!monto||monto<=0){toast('Ingresa un monto válido','error');return;}
+  const fecha=document.getElementById('epago-fecha').value;
+  const cuenta=document.getElementById('epago-cuenta').value;
+  const nota=document.getElementById('epago-nota').value;
+  const old=x.pagos[pi];
+  // Intentar actualizar el movimiento de caja asociado a este pago (coincidencia por categoría, monto y fecha originales)
+  const cajaIdx=DB.caja.findIndex(c=>(c.categoria==='Cobro CxC'||c.categoria==='CxC Manual')&&(c.descripcion||'').includes(x.factura||'§§')&&Math.abs(parseFloat(c.monto||0)-parseFloat(old.monto||0))<0.01&&c.fecha===old.fecha);
+  if(cajaIdx>=0){DB.caja[cajaIdx].monto=monto;DB.caja[cajaIdx].fecha=fecha;DB.caja[cajaIdx].cuenta=limpiarCuenta(cuenta);}
+  x.pagos[pi]={...old,monto,fecha,cuenta,nota};
+  recalcCXCDesdeCPagos(ci);
+  sDB('cxc');sDB('caja');
+  refreshCajaIfActive();
+  closeModal();
+  toast('Pago actualizado ✓','success');
+  verAbonosCXC(cxcId);
+  renderCXC();
+}
+
+function borrarPagoCXC(cxcId,pagoId){
+  if(!canDo('eliminar')){toast('No tienes permiso para eliminar','error');return;}
+  const x=DB.cxc.find(c=>c.id===cxcId);if(!x)return;
+  const pi=(x.pagos||[]).findIndex((p,idx)=>(p.id||('idx'+idx))===pagoId);if(pi<0)return;
+  const p=x.pagos[pi];
+  openModal('🗑 Eliminar Pago',`<p>¿Eliminar el pago de <strong>${fmt(p.monto)}</strong> registrado el ${fmtDate(p.fecha)}?</p><p style="font-size:12px;color:var(--gray);margin-top:6px">Esto también intentará eliminar el movimiento correspondiente en Caja, y recalculará el saldo de la cuenta.</p>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+     <button class="btn btn-red" onclick="confirmarBorrarPagoCXC('${cxcId}','${pagoId}')">🗑 Eliminar</button>`);
+}
+
+function confirmarBorrarPagoCXC(cxcId,pagoId){
+  const ci=DB.cxc.findIndex(c=>c.id===cxcId);if(ci<0)return;
+  const x=DB.cxc[ci];
+  const pi=(x.pagos||[]).findIndex((p,idx)=>(p.id||('idx'+idx))===pagoId);if(pi<0)return;
+  const p=x.pagos[pi];
+  const cajaIdx=DB.caja.findIndex(c=>(c.categoria==='Cobro CxC'||c.categoria==='CxC Manual')&&(c.descripcion||'').includes(x.factura||'§§')&&Math.abs(parseFloat(c.monto||0)-parseFloat(p.monto||0))<0.01&&c.fecha===p.fecha);
+  if(cajaIdx>=0)DB.caja.splice(cajaIdx,1);
+  x.pagos.splice(pi,1);
+  recalcCXCDesdeCPagos(ci);
+  sDB('cxc');sDB('caja');
+  refreshCajaIfActive();
+  closeModal();
+  toast('Pago eliminado ✓','success');
+  verAbonosCXC(cxcId);
+  renderCXC();
 }
 
 function imprimirResumenPagosCXC(id){

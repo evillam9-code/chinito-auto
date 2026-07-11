@@ -1044,15 +1044,14 @@ function renderFeria(){
     <!-- VISTA VENDEDOR -->
     <div id="feria-panel-vendedor">
       <div class="card" style="margin-bottom:14px">
-        <div class="form-field" style="margin-bottom:0">
-          <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gray)">🔍 Seleccionar Vehículo</label>
-          <select id="feria-veh-sel" onchange="feriaCargarVehiculo(this.value)" style="margin-top:6px;font-size:14px;padding:10px">
-            <option value="">-- Seleccionar del inventario --</option>
-            ${vehDisp.map(v=>{
-              const ex=(DB.feria?.extras||{})[v.id]||{};
-              return `<option value="${v.id}">${escHtml(v.codigo)} — ${escHtml(v.marca)} ${escHtml(v.modelo)} ${v.anio||''}${ex.precioFeria?' ✓':''}</option>`;
-            }).join('')}
-          </select>
+        <div class="form-field" style="margin-bottom:0;position:relative">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gray)">🔍 Buscar Vehículo (marca, código o chasis)</label>
+          <input type="text" id="feria-veh-buscar" placeholder="Ej: Honda, código o chasis..." autocomplete="off"
+            oninput="feriaFiltrarVehSel(this.value)" onfocus="feriaFiltrarVehSel(this.value)"
+            onblur="setTimeout(function(){var b=document.getElementById('feria-veh-sugerencias');if(b)b.style.display='none';},180)"
+            style="margin-top:6px;font-size:14px;padding:10px;width:100%">
+          <input type="hidden" id="feria-veh-sel" value="">
+          <div id="feria-veh-sugerencias" style="display:none;position:absolute;z-index:50;left:0;right:0;background:#fff;border:1.5px solid var(--gray3);border-radius:8px;max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.15);margin-top:2px"></div>
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;color:#166534;text-align:center;margin-top:8px">
             📢 Tasa oficial: RD$ ${parseFloat(DB.config.tasaCambio||60).toFixed(2)}
           </div>
@@ -1177,6 +1176,39 @@ function renderFeria(){
   },50);
 }
 
+function feriaFiltrarVehSel(q){
+  const box=document.getElementById('feria-veh-sugerencias');
+  if(!box)return;
+  const vehDisp=DB.vehiculos.filter(v=>v.status==='ACTIVO'||v.status==='ADUANA');
+  const term=(q||'').trim().toLowerCase();
+  const filtrados=term?vehDisp.filter(v=>{
+    const hay=[v.codigo,v.marca,v.modelo,v.vin,v.anio,v.color].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(term);
+  }):vehDisp;
+  if(!filtrados.length){
+    box.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--gray);text-align:center">Sin resultados</div>';
+    box.style.display='block';
+    return;
+  }
+  box.innerHTML=filtrados.slice(0,50).map(v=>{
+    const ex=(DB.feria?.extras||{})[v.id]||{};
+    return `<div onmousedown="feriaElegirVehSel('${v.id}')" style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--gray3)" onmouseover="this.style.background='var(--gray2)'" onmouseout="this.style.background=''">
+      <div style="font-weight:700;color:var(--navy)">${escHtml(v.codigo)} — ${escHtml(v.marca)} ${escHtml(v.modelo)} ${v.anio||''}${ex.precioFeria?' ✓':''}</div>
+      <div style="font-size:11px;color:var(--gray)">${escHtml(v.color||'')} ${v.vin?'· VIN: '+escHtml(v.vin):''}</div>
+    </div>`;
+  }).join('');
+  box.style.display='block';
+}
+function feriaElegirVehSel(vid){
+  const v=DB.vehiculos.find(x=>x.id===vid);
+  const selEl=document.getElementById('feria-veh-sel');
+  if(selEl)selEl.value=vid;
+  const inp=document.getElementById('feria-veh-buscar');
+  if(inp&&v)inp.value=v.codigo+' — '+v.marca+' '+v.modelo+' '+(v.anio||'');
+  const box=document.getElementById('feria-veh-sugerencias');
+  if(box)box.style.display='none';
+  feriaCargarVehiculo(vid);
+}
 function feriaShowTab(tab){
   ['vendedor','extras','historial'].forEach(t=>{
     const panel=document.getElementById('feria-panel-'+t);
@@ -2385,15 +2417,17 @@ function abrirFichaVehiculo(vehiculoId){
   const tabPagos=(cxc,titulo,color)=>{
     if(!cxc)return'';
     const pagos=cxc.pagos||[];
+    const esUSDcxc=(cxc.moneda||'RD$')==='USD';
+    const fVcxc=n=>esUSDcxc?'US$ '+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2}):fmt(n);
     return`<div class="sec">
       <div class="sec-titulo" style="background:${color}">${titulo}</div>
       <div class="resumen">
-        <div class="resumen-row"><span>Total</span><span style="font-weight:700">${fmt(cxc.total||0)}</span></div>
-        <div class="resumen-row"><span>Cobrado</span><span style="color:#16a34a;font-weight:700">${fmt(cxc.abonado||0)}</span></div>
-        <div class="resumen-row"><span>${parseFloat(cxc.saldo||0)>0?'⏳ Pendiente':'✅ Saldado'}</span><span style="font-weight:800;color:${parseFloat(cxc.saldo||0)>0?'#dc2626':'#16a34a'}">${fmt(cxc.saldo||0)}</span></div>
+        <div class="resumen-row"><span>Total</span><span style="font-weight:700">${fVcxc(cxc.total||0)}</span></div>
+        <div class="resumen-row"><span>Cobrado</span><span style="color:#16a34a;font-weight:700">${fVcxc(cxc.abonado||0)}</span></div>
+        <div class="resumen-row"><span>${parseFloat(cxc.saldo||0)>0?'⏳ Pendiente':'✅ Saldado'}</span><span style="font-weight:800;color:${parseFloat(cxc.saldo||0)>0?'#dc2626':'#16a34a'}">${fVcxc(cxc.saldo||0)}</span></div>
       </div>
       ${pagos.length?`<table style="margin-top:6px"><thead><tr><th>Fecha</th><th>Monto</th><th>Cuenta</th><th>Nota</th></tr></thead><tbody>
-        ${pagos.map(p=>`<tr><td>${fmtDate(p.fecha)}</td><td style="font-weight:700;color:#16a34a">${fmt(p.monto)}</td><td>${escHtml(p.cuenta||'—')}</td><td>${escHtml(p.nota||'—')}</td></tr>`).join('')}
+        ${pagos.map(p=>`<tr><td>${fmtDate(p.fecha)}</td><td style="font-weight:700;color:#16a34a">${fVcxc(p.monto)}</td><td>${escHtml(p.cuenta||'—')}</td><td>${escHtml(p.nota||'—')}</td></tr>`).join('')}
       </tbody></table>`:'<div style="font-size:11px;color:#94a3b8;padding:6px">Sin pagos registrados</div>'}
     </div>`;
   };
@@ -5244,16 +5278,31 @@ function renderAlertas(){
   if(DB.seguros&&DB.seguros.length){
     const d30=new Date();d30.setDate(d30.getDate()+30);
     const d30str=d30.toISOString().slice(0,10);
+    const d7=new Date();d7.setDate(d7.getDate()+7);
+    const d7str=d7.toISOString().slice(0,10);
     DB.seguros.forEach(s=>{
-      if(!s.hasta)return;
       const veh=DB.vehiculos.find(v=>v.id===s.vehiculoId);
       const label=escHtml((veh?veh.codigo+' '+veh.marca+' '+veh.modelo:s.cliente||''))+' — Aseg: '+escHtml(s.compania||'');
-      if(s.hasta<hoy){
-        alertas.push({tipo:'SEGURO_VENCIDO',nivel:'danger',titulo:'🔴 Seguro VENCIDO',msg:label+' — Venció: '+fmtDate(s.hasta)+(s.telefono?' — 📞 '+s.telefono:''),modulo:'seguros',id:'sv_'+s.id});
-      } else if(s.hasta<=d30str){
-        const diasR=Math.ceil((new Date(s.hasta)-hoyDate)/(1000*60*60*24));
-        alertas.push({tipo:'SEGURO_PROX',nivel:'warning',titulo:'🔔 Seguro vence en '+diasR+' días',msg:label+' — Vence: '+fmtDate(s.hasta)+(s.telefono?' — 📞 '+s.telefono:''),modulo:'seguros',id:'sp_'+s.id});
+      if(s.hasta){
+        if(s.hasta<hoy){
+          alertas.push({tipo:'SEGURO_VENCIDO',nivel:'danger',titulo:'🔴 Seguro VENCIDO',msg:label+' — Venció: '+fmtDate(s.hasta)+(s.telefono?' — 📞 '+s.telefono:''),modulo:'seguros',id:'sv_'+s.id});
+        } else if(s.hasta<=d30str){
+          const diasR=Math.ceil((new Date(s.hasta)-hoyDate)/(1000*60*60*24));
+          alertas.push({tipo:'SEGURO_PROX',nivel:'warning',titulo:'🔔 Seguro vence en '+diasR+' días',msg:label+' — Vence: '+fmtDate(s.hasta)+(s.telefono?' — 📞 '+s.telefono:''),modulo:'seguros',id:'sp_'+s.id});
+        }
       }
+      // Cuotas pendientes (modalidad 2 o 3 cuotas): próximas a vencer o ya vencidas
+      (s.cuotas||[]).forEach((c,ci)=>{
+        if(c.pagado||!c.fecha)return;
+        const vencida=c.fecha<hoy;
+        const proxima=c.fecha>=hoy&&c.fecha<=d7str;
+        if(!vencida&&!proxima)return;
+        if(vencida){
+          alertas.push({tipo:'SEGURO_CUOTA_VENCIDA',nivel:'danger',titulo:'⚠️ Cuota de seguro VENCIDA',msg:label+' — Cuota '+(c.cuota||ci+1)+' — Fecha: '+fmtDate(c.fecha),modulo:'seguros',id:'sqv_'+s.id+'_'+ci});
+        } else {
+          alertas.push({tipo:'SEGURO_CUOTA_PROX',nivel:'warning',titulo:'⏰ Cuota de seguro próxima a vencer',msg:label+' — Cuota '+(c.cuota||ci+1)+' — Fecha: '+fmtDate(c.fecha),modulo:'seguros',id:'sqp_'+s.id+'_'+ci});
+        }
+      });
     });
   }
 
@@ -12320,22 +12369,30 @@ function imprimirAutorizacion(a){
   const win=window.open('','_blank','width=900,height=700');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Autorización de Compra</title>
   <style>
-    body{font-family:Arial,sans-serif;padding:40px;font-size:13px;color:#1a1a1a}
-    .header{border-bottom:3px solid #0f172a;padding-bottom:16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start}
-    .empresa-nombre{font-size:22px;font-weight:900;color:#0f172a}
-    .empresa-datos{font-size:12px;color:#64748b;margin-top:4px}
-    .titulo{font-size:18px;font-weight:800;text-align:center;margin:24px 0;text-transform:uppercase;letter-spacing:1px;color:#0f172a;border:2px solid #0f172a;padding:10px}
-    table{width:100%;border-collapse:collapse;margin:20px 0}
-    th{background:#0f172a;color:#fff;padding:10px;text-align:left;font-size:12px}
-    td{padding:10px;border-bottom:1px solid #e2e8f0;font-size:12px}
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;padding:26px 32px;font-size:12.5px;color:#1a1a1a}
+    .header{border-bottom:3px solid #0f172a;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start}
+    .empresa-nombre{font-size:20px;font-weight:900;color:#0f172a}
+    .empresa-datos{font-size:11.5px;color:#64748b;margin-top:4px}
+    .titulo{font-size:16px;font-weight:800;text-align:center;margin:14px 0;text-transform:uppercase;letter-spacing:1px;color:#0f172a;border:2px solid #0f172a;padding:7px}
+    table{width:100%;border-collapse:collapse;margin:12px 0}
+    th{background:#0f172a;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+    td{padding:6px 10px;border-bottom:1px solid #e2e8f0;font-size:12px}
     tr:nth-child(even){background:#f8fafc}
-    .mensaje{margin:24px 0;padding:16px;background:#f8fafc;border-left:4px solid #2563eb;font-size:13px;line-height:1.6}
-    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:48px}
-    .firma-linea{border-top:1px solid #0f172a;padding-top:8px;font-size:12px;text-align:center;color:#64748b}
-    @media print{button{display:none}}
+    .mensaje{margin:14px 0;padding:12px;background:#f8fafc;border-left:4px solid #2563eb;font-size:12px;line-height:1.5}
+    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:34px}
+    .firma-linea{border-top:1px solid #0f172a;padding-top:6px;font-size:12px;text-align:center;color:#64748b}
+    .np-opciones{margin-top:10px;font-size:12.5px;color:#334155;display:flex;align-items:center;justify-content:center;gap:8px}
+    @media print{
+      button,.np-opciones{display:none}
+      body{padding:0}
+      .hoja{padding:10mm}
+      @page{size:letter portrait;margin:0}
+    }
   </style></head><body>
+  <div class="hoja">
   <div class="header">
-    <div>
+    <div id="ai-empresa-info">
       <div class="empresa-nombre">${escHtml(empresa)}</div>
       <div class="empresa-datos">
         ${rnc?'RNC: '+escHtml(rnc)+'<br>':''}
@@ -12357,22 +12414,26 @@ function imprimirAutorizacion(a){
     </tbody>
   </table>
   <div class="mensaje">
-    Por medio de la presente, <strong>${escHtml(empresa)}</strong> solicita formalmente a <strong>${escHtml(a.suplidor)}</strong> 
+    Por medio de la presente, <strong id="ai-empresa-mensaje">${escHtml(empresa)}</strong> solicita formalmente a <strong>${escHtml(a.suplidor)}</strong> 
     el suministro de los productos detallados en este documento. Solicitamos que los artículos sean 
     entregados según los términos acordados entre las partes. Esta autorización fue emitida el <strong>${fecha}</strong> 
     y es válida únicamente para los productos aquí especificados.
   </div>
   <div class="firmas">
     <div>
-      <div style="height:60px"></div>
+      <div style="height:44px"></div>
       <div class="firma-linea">Firma del Responsable de Compra</div>
     </div>
     <div>
-      <div style="height:60px"></div>
+      <div style="height:44px"></div>
       <div class="firma-linea">${escHtml(responsable||'Propietario / Administrador')}<br>${escHtml(empresa)}</div>
     </div>
   </div>
-  <br><button onclick="window.print()">🖨️ Imprimir</button>
+  <div class="np-opciones">
+    <label><input type="checkbox" id="ai-chk-empresa" checked onchange="document.getElementById('ai-empresa-info').style.display=this.checked?'':'none'">Incluir datos de la empresa</label>
+  </div>
+  <br><button onclick="window.print()" style="margin-top:6px;padding:10px 24px;background:#0f172a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">🖨️ Imprimir</button>
+  </div>
   </body></html>`);
   win.document.close();
 }
@@ -13952,6 +14013,9 @@ function quickNuevoCliente(callbackSelectId){
       <div class="form-field"><label>Ciudad</label>
         <input type="text" id="qc-ciudad" placeholder="Ej: Santiago">
       </div>
+    </div>
+    <div class="form-field"><label>Dirección</label>
+      <input type="text" id="qc-direccion" placeholder="Calle, número, sector...">
     </div>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
      <button class="btn btn-primary" onclick="quickGuardarCliente('${callbackSelectId}')">✅ Guardar y Seleccionar</button>`);
@@ -13962,9 +14026,10 @@ function quickGuardarCliente(selectId){
   const tel=document.getElementById('qc-tel')?.value.trim()||'';
   const doc=document.getElementById('qc-doc')?.value.trim()||'';
   const ciudad=document.getElementById('qc-ciudad')?.value.trim()||'';
+  const direccion=document.getElementById('qc-direccion')?.value.trim()||'';
   if(!nombre){toast('El nombre es requerido','error');return;}
   const nuevo={id:uid(),nombre,telefono:tel,documento:doc,ciudad,tipoDoc:'Cédula',
-    ingresos:0,provincia:'',direccion:'',correo:'',whatsapp:tel,
+    ingresos:0,provincia:'',direccion,correo:'',whatsapp:tel,
     fechaCumpleanos:'',refNombre:'',refTel:'',docFrente:'',docDorso:''};
   if(!DB.clientes)DB.clientes=[];
   DB.clientes.push(nuevo);

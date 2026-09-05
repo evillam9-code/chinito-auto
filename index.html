@@ -7634,7 +7634,9 @@ function _generarPDFGastosVeh(gastos,tasa,filtroSup,filtroVeh,soloUnVeh){
 // ══ VENTAS ══
 function renderVentas(){
   const mes=document.getElementById('ventas-mes')?.value||'';
-  const ventasFilt=mes?DB.ventas.filter(v=>v.fecha?.startsWith(mes)):DB.ventas;
+  const estado=document.getElementById('ventas-estado')?.value||'';
+  let ventasFilt=mes?DB.ventas.filter(v=>v.fecha?.startsWith(mes)):DB.ventas;
+  if(estado)ventasFilt=ventasFilt.filter(v=>(v.estadoVenta||'VENDIDO')===estado);
   const tasa=parseFloat(DB.config.tasaCambio||60);
   // Convertir todo a RD$ para los totales
   const totalV=ventasFilt.reduce((a,v)=>a+(v.moneda==='USD'?parseFloat(v.precioVenta||0)*(v.tasaCambio||tasa):parseFloat(v.precioVenta||0)),0);
@@ -7646,13 +7648,18 @@ function renderVentas(){
       <div><h1>💰 Ventas</h1><p>${ventasFilt.length} venta(s)${mes?' en el mes seleccionado':''}</p></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="month" id="ventas-mes" value="${mes}" onchange="renderVentas()" style="padding:7px 12px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px">
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ventas-mes').value='';renderVentas()">🔄 Todos</button>
+        <select id="ventas-estado" onchange="renderVentas()" style="padding:7px 12px;border:1.5px solid var(--gray3);border-radius:var(--radius-sm);font-size:13px">
+          <option value="" ${estado===''?'selected':''}>Todos los estados</option>
+          <option value="VENDIDO" ${estado==='VENDIDO'?'selected':''}>Ventas (Vendido)</option>
+          <option value="TRÁNSITO" ${estado==='TRÁNSITO'?'selected':''}>Tránsito</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ventas-mes').value='';document.getElementById('ventas-estado').value='';renderVentas()">🔄 Todos</button>
         <div style="width:1px;height:28px;background:var(--gray3);margin:0 2px"></div>
         <button id="vta-btn-imprimir" disabled class="btn btn-sm" style="${ds}" onclick="ventaAccion('imprimir')" title="Imprimir factura">🖨️ Imprimir</button>
         ${(currentUser?.role==='admin'||canDo('editar'))?`<button id="vta-btn-editar" disabled class="btn btn-sm" style="${ds}" onclick="ventaAccion('editar')" title="Editar">✏️ Editar</button>`:''}
         ${(currentUser?.role==='admin'||canDo('eliminar'))?`<button id="vta-btn-eliminar" disabled class="btn btn-sm" style="${ds}" onclick="ventaAccion('eliminar')" title="Eliminar">🗑 Eliminar</button>`:''}
         <div style="width:1px;height:28px;background:var(--gray3);margin:0 2px"></div>
-        <button class="btn btn-secondary btn-sm" onclick="exportarVentasPDF('${mes}')">📄 PDF</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportarVentasPDF('${mes}','${estado}')">📄 PDF</button>
         <button class="btn btn-primary" onclick="nuevaVenta()">➕ Nueva Venta</button>
       </div>
     </div>
@@ -9082,82 +9089,94 @@ function confirmarVenta(nf){
   // Registrar en caja
   const montoCajaVenta=(montoRecibido>0)?(inicial-montoRecibido):inicial||precio;
   const _bv=(DB.config.bancoCuentas||[]).find(b=>(b.cuentas||[]).some(c=>c.tipo+' — '+c.numero===cuenta))?.banco||document.getElementById('sv-banco')?.value||'';
-  DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Venta de Vehículo',descripcion:`Venta: ${v.codigo} ${v.marca} ${v.modelo}`,monto:montoCajaVenta,referencia:nf,cuenta:limpiarCuenta(cuenta),moneda:monedaVenta||'RD$',referencia:nf,cuenta,banco:normalizarBancoGlobal(_bv),moneda:'RD$',responsable:currentUser.nombre});
-  if(montoRecibido>0)DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Vehículo Recibido como P/Pago',descripcion:`Vehículo recibido: ${venta.vehiculoRecibido?.vehiculo||'—'} — Venta: ${nf}`,monto:montoRecibido,referencia:nf,cuenta:limpiarCuenta(cuenta),moneda:monedaVenta||'RD$',banco:normalizarBancoGlobal(_bv),responsable:currentUser.nombre});
-  // Si hay pendiente → CxC automática
-  if(pendiente>0){
-    const abonadoInicial=inicial+montoRecibido;
-    DB.cxc.push({id:uid(),ventaId:venta.id,factura:nf,cliente:cliNombre,clienteId:cliId,vehiculo:`${v.codigo} ${v.marca} ${v.modelo}`,concepto:'Pendiente de venta',moneda:monedaVenta,total:precio,abonado:abonadoInicial,saldo:pendiente,fecha:venta.fecha,fechaVence:'',status:pendiente<=0?'SALDADO':abonadoInicial>0?'PARCIAL':'PENDIENTE',pagos:[]});
-    sDB('cxc');
-  }
-  // ═══ ENDOSO → CXP al gestor (empresa lo paga) ═══
-  if(tipoTransferencia==='endoso'&&montoEndoso>0&&gestorTransf){
-    const cxpEndoso={
-      id:uid(),vehiculoId:vid,
-      tipo:'ENDOSO',
-      suplidor:gestorTransf,
-      descripcion:'Endoso de placa — Vehículo: '+v.codigo+' '+v.marca+' '+v.modelo,
-      moneda:'RD$',
-      montoFactura:montoEndoso,montoPagado:0,montoPendiente:montoEndoso,
-      statusGasto:'PENDIENTE',
-      fecha:venta.fecha,
-      cuenta:'',formaPago:'CREDITO',
-      origenVenta:nf,ventaId:venta.id,
-      esTransferencia:true
-    };
-    if(!DB.gastosVehiculos)DB.gastosVehiculos=[];
-    DB.gastosVehiculos.push(cxpEndoso);
-    sDB('gastosVehiculos');
-    // Actualizar costo del vehículo
-    const vi2=DB.vehiculos.findIndex(x=>x.id===vid);
-    if(vi2>=0){DB.vehiculos[vi2].costo=(parseFloat(DB.vehiculos[vi2].costo||0)+montoEndoso);sDB('vehiculos');}
-    toast('CXP de Endoso creada al gestor: '+gestorTransf,'success');
-  }
-  // ═══ TRASPASO → CXP al gestor + CXC al cliente si no pagó ═══
-  if(tipoTransferencia==='traspaso'&&montoTraspaso>0&&gestorTransf){
-    // Siempre CXP al gestor
-    const cxpTraspaso={
-      id:uid(),vehiculoId:vid,
-      tipo:'TRASPASO',
-      suplidor:gestorTransf,
-      descripcion:'Traspaso/Matrícula — Vehículo: '+v.codigo+' '+v.marca+' '+v.modelo,
-      moneda:'RD$',
-      montoFactura:montoTraspaso,montoPagado:0,montoPendiente:montoTraspaso,
-      statusGasto:'PENDIENTE',
-      fecha:venta.fecha,
-      cuenta:'',formaPago:'CREDITO',
-      origenVenta:nf,ventaId:venta.id,
-      esTransferencia:true
-    };
-    if(!DB.gastosVehiculos)DB.gastosVehiculos=[];
-    DB.gastosVehiculos.push(cxpTraspaso);
-    sDB('gastosVehiculos');
-    // Si el cliente NO pagó → CXC al cliente
-    if(!traspasoPagadoCliente){
-      const cxcTraspaso={
-        id:uid(),ventaId:venta.id,factura:nf,
-        cliente:cliNombre,clienteId:cliId,
-        vehiculo:v.codigo+' '+v.marca+' '+v.modelo,
-        concepto:'Traspaso/Matrícula pendiente — '+v.codigo,
-        moneda:'RD$',
-        total:montoTraspaso,abonado:0,saldo:montoTraspaso,
-        fecha:venta.fecha,fechaVence:'',
-        status:'PENDIENTE',pagos:[],
-        esTraspaso:true
-      };
-      DB.cxc.push(cxcTraspaso);
-      sDB('cxc');
-      toast('CXC de Traspaso creada al cliente: '+cliNombre,'success');
-    } else {
-      toast('CXP de Traspaso creada al gestor: '+gestorTransf,'success');
-    }
-  }
+  DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Venta de Vehículo',descripcion:`Venta: ${v.codigo} ${v.marca} ${v.modelo}`,monto:montoCajaVenta,referencia:nf,cuenta:limpiarCuenta(cuenta),moneda:monedaVenta||'RD$',referencia:nf,cuenta,banco:normalizarBancoGlobal(_bv),moneda:'RD$',responsable:currentUser?.nombre||''});
+  if(montoRecibido>0)DB.caja.push({id:uid(),fecha:venta.fecha,tipo:'ENTRADA',categoria:'Vehículo Recibido como P/Pago',descripcion:`Vehículo recibido: ${venta.vehiculoRecibido?.vehiculo||'—'} — Venta: ${nf}`,monto:montoRecibido,referencia:nf,cuenta:limpiarCuenta(cuenta),moneda:monedaVenta||'RD$',banco:normalizarBancoGlobal(_bv),responsable:currentUser?.nombre||''});
+  // Guardar de inmediato lo esencial — lo que sigue (CxC, endoso, traspaso) no debe
+  // poder perder la venta si algo falla ahí.
   sDB('ventas');sDB('caja');
+  try{
+    // Si hay pendiente → CxC automática
+    if(pendiente>0){
+      const abonadoInicial=inicial+montoRecibido;
+      DB.cxc.push({id:uid(),ventaId:venta.id,factura:nf,cliente:cliNombre,clienteId:cliId,vehiculo:`${v.codigo} ${v.marca} ${v.modelo}`,concepto:'Pendiente de venta',moneda:monedaVenta,total:precio,abonado:abonadoInicial,saldo:pendiente,fecha:venta.fecha,fechaVence:'',status:pendiente<=0?'SALDADO':abonadoInicial>0?'PARCIAL':'PENDIENTE',pagos:[]});
+      sDB('cxc');
+    }
+    // ═══ ENDOSO → CXP al gestor (empresa lo paga) ═══
+    if(tipoTransferencia==='endoso'&&montoEndoso>0&&gestorTransf){
+      const cxpEndoso={
+        id:uid(),vehiculoId:vid,
+        tipo:'ENDOSO',
+        suplidor:gestorTransf,
+        descripcion:'Endoso de placa — Vehículo: '+v.codigo+' '+v.marca+' '+v.modelo,
+        moneda:'RD$',
+        montoFactura:montoEndoso,montoPagado:0,montoPendiente:montoEndoso,
+        statusGasto:'PENDIENTE',
+        fecha:venta.fecha,
+        cuenta:'',formaPago:'CREDITO',
+        origenVenta:nf,ventaId:venta.id,
+        esTransferencia:true
+      };
+      if(!DB.gastosVehiculos)DB.gastosVehiculos=[];
+      DB.gastosVehiculos.push(cxpEndoso);
+      sDB('gastosVehiculos');
+      // Actualizar costo del vehículo
+      const vi2=DB.vehiculos.findIndex(x=>x.id===vid);
+      if(vi2>=0){DB.vehiculos[vi2].costo=(parseFloat(DB.vehiculos[vi2].costo||0)+montoEndoso);sDB('vehiculos');}
+      toast('CXP de Endoso creada al gestor: '+gestorTransf,'success');
+    }
+    // ═══ TRASPASO → CXP al gestor + CXC al cliente si no pagó ═══
+    if(tipoTransferencia==='traspaso'&&montoTraspaso>0&&gestorTransf){
+      // Siempre CXP al gestor
+      const cxpTraspaso={
+        id:uid(),vehiculoId:vid,
+        tipo:'TRASPASO',
+        suplidor:gestorTransf,
+        descripcion:'Traspaso/Matrícula — Vehículo: '+v.codigo+' '+v.marca+' '+v.modelo,
+        moneda:'RD$',
+        montoFactura:montoTraspaso,montoPagado:0,montoPendiente:montoTraspaso,
+        statusGasto:'PENDIENTE',
+        fecha:venta.fecha,
+        cuenta:'',formaPago:'CREDITO',
+        origenVenta:nf,ventaId:venta.id,
+        esTransferencia:true
+      };
+      if(!DB.gastosVehiculos)DB.gastosVehiculos=[];
+      DB.gastosVehiculos.push(cxpTraspaso);
+      sDB('gastosVehiculos');
+      // Si el cliente NO pagó → CXC al cliente
+      if(!traspasoPagadoCliente){
+        const cxcTraspaso={
+          id:uid(),ventaId:venta.id,factura:nf,
+          cliente:cliNombre,clienteId:cliId,
+          vehiculo:v.codigo+' '+v.marca+' '+v.modelo,
+          concepto:'Traspaso/Matrícula pendiente — '+v.codigo,
+          moneda:'RD$',
+          total:montoTraspaso,abonado:0,saldo:montoTraspaso,
+          fecha:venta.fecha,fechaVence:'',
+          status:'PENDIENTE',pagos:[],
+          esTraspaso:true
+        };
+        DB.cxc.push(cxcTraspaso);
+        sDB('cxc');
+        toast('CXC de Traspaso creada al cliente: '+cliNombre,'success');
+      } else {
+        toast('CXP de Traspaso creada al gestor: '+gestorTransf,'success');
+      }
+    }
+  }catch(e){
+    console.warn('Error registrando CxC/endoso/traspaso de la venta (la venta ya quedó guardada):',e.message);
+    toast('⚠️ La venta se guardó, pero hubo un problema con el traspaso/endoso — revísalo manualmente','warning');
+  }
   refreshCajaIfActive();
   closeModal();
-  // Imprimir recibo automáticamente
-  imprimirFactura(venta.id);
-  logBit('ventas','Registró venta',`${_vRef?.codigo||''} ${_vRef?.marca||''} ${_vRef?.modelo||''}`);toast('Venta registrada ✓ — Generando recibo...','success');
+  try{
+    // Imprimir recibo automáticamente
+    imprimirFactura(venta.id);
+    logBit('ventas','Registró venta',`${v.codigo||''} ${v.marca||''} ${v.modelo||''}`);
+  }catch(e){
+    console.warn('Error al imprimir/registrar bitácora de la venta:',e.message);
+  }
+  toast('Venta registrada ✓ — Generando recibo...','success');
   renderVentas();
 }
 
@@ -9797,10 +9816,12 @@ function imprimirFactura(vid){
   win.addEventListener('focus',()=>{window.focus();});
 }
 
-function exportarVentasPDF(mes){
-  const ventasFilt=mes?DB.ventas.filter(v=>v.fecha?.startsWith(mes)):DB.ventas;
+function exportarVentasPDF(mes,estado){
+  let ventasFilt=mes?DB.ventas.filter(v=>v.fecha?.startsWith(mes)):DB.ventas;
+  if(estado)ventasFilt=ventasFilt.filter(v=>(v.estadoVenta||'VENDIDO')===estado);
   const totalV=ventasFilt.reduce((a,v)=>a+parseFloat(v.precioVenta||0),0);
   const totalPend=ventasFilt.reduce((a,v)=>a+parseFloat(v.pendiente||0),0);
+  const estadoLabel={VENDIDO:'Ventas (Vendido)',TRÁNSITO:'Tránsito'}[estado]||'Todos los estados';
   const win=window.open('','_blank','width=1100,height=750');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ventas</title>
   <style>body{font-family:Arial,sans-serif;padding:24px;font-size:12px}h2{font-size:18px;margin:0}
@@ -9811,8 +9832,8 @@ function exportarVentasPDF(mes){
   @media print{.np{display:none}}</style></head><body>
   <div style="border-bottom:2px solid #2563eb;padding-bottom:12px;margin-bottom:14px;display:flex;justify-content:space-between">
     <div><h2>${escHtml(DB.config.empresa||'DealerSystem')}</h2>
-    <div style="color:#6b7280">REPORTE DE VENTAS${mes?' — '+mes:''} | ${fmtDate(today())}</div></div>
-    <div style="text-align:right"><div style="font-size:10px;color:#6b7280">TOTAL VENTAS</div><div style="font-size:20px;font-weight:800;color:#16a34a">${fmt(totalV)}</div></div>
+    <div style="color:#6b7280">REPORTE DE VENTAS${mes?' — '+mes:''} — ${estadoLabel} | ${fmtDate(today())}</div></div>
+    <div style="text-align:right"><div style="font-size:10px;color:#6b7280">TOTAL (${ventasFilt.length})</div><div style="font-size:20px;font-weight:800;color:#16a34a">${fmt(totalV)}</div></div>
   </div>
   <table><thead><tr><th>Factura</th><th>Fecha</th><th>Vehículo</th><th>Chasis</th><th>Cliente</th><th>Precio</th><th>Inicial</th><th>Pendiente</th><th>Método</th><th>Estado</th></tr></thead>
   <tbody>${ventasFilt.slice().reverse().map(v=>{
@@ -11244,13 +11265,25 @@ function imprimirCXP(){
   const gastosUSD=gastosPend.filter(g=>g.moneda==='USD');
   const totalRD=gastosRD.reduce((a,g)=>a+parseFloat(g.montoPendiente||0),0);
   const totalUSD=gastosUSD.reduce((a,g)=>a+parseFloat(g.montoPendiente||0),0);
-  const generarFilas=(lista)=>lista.map(g=>{
-    const v=DB.vehiculos.find(x=>x.id===g.vehiculoId);
-    const esUSD=g.moneda==='USD';
+  // Agrupa una lista (de una sola moneda) por suplidor: filas de vehículo/deuda + subtotal por suplidor
+  const generarPorSuplidor=(lista)=>{
+    if(!lista.length)return'';
+    const esUSD=lista[0].moneda==='USD';
     const fV=(n)=>esUSD?'$'+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2}):fmt(n);
     const sc={ABONADO:'a',PENDIENTE:'r'};
-    return`<tr><td>${fmtDate(g.fecha)}</td><td style="font-weight:700">${escHtml(g.suplidor||'—')}</td><td>${v?escHtml(v.codigo+' '+v.marca+' '+v.modelo):'—'}</td><td style="font-family:monospace;font-size:10px">${escHtml(v?.vin||'—')}</td><td>${escHtml(g.tipo||'—')}</td><td>${fV(g.montoFactura||0)}</td><td style="color:#16a34a">${fV(g.montoPagado||0)}</td><td style="font-weight:800;color:#dc2626">${fV(g.montoPendiente||0)}</td><td><span class="badge ${sc[g.statusGasto||'PENDIENTE']||'r'}">${g.statusGasto||'PENDIENTE'}</span></td></tr>`;
-  }).join('');
+    const porSuplidor={};
+    lista.forEach(g=>{const s=g.suplidor||'Sin suplidor';(porSuplidor[s]=porSuplidor[s]||[]).push(g);});
+    return Object.keys(porSuplidor).sort((a,b)=>a.localeCompare(b)).map(sup=>{
+      const items=porSuplidor[sup];
+      const subtotal=items.reduce((a,g)=>a+parseFloat(g.montoPendiente||0),0);
+      const filas=items.map(g=>{
+        const v=DB.vehiculos.find(x=>x.id===g.vehiculoId);
+        return`<tr><td>${fmtDate(g.fecha)}</td><td>${v?escHtml(v.codigo+' '+v.marca+' '+v.modelo):escHtml(g.vehiculo||'—')}</td><td style="font-family:monospace;font-size:10px">${escHtml(v?.vin||g.vin||'—')}</td><td>${escHtml(g.tipo||'—')}</td><td>${fV(g.montoFactura||0)}</td><td style="color:#16a34a">${fV(g.montoPagado||0)}</td><td style="font-weight:800;color:#dc2626">${fV(g.montoPendiente||0)}</td><td><span class="badge ${sc[g.statusGasto||'PENDIENTE']||'r'}">${g.statusGasto||'PENDIENTE'}</span></td></tr>`;
+      }).join('');
+      return`<tr><td colspan="8" style="background:#0f172a12;font-weight:800;padding:8px 10px">🏭 ${escHtml(sup)}</td></tr>${filas}
+      <tr style="background:#f1f5f9"><td colspan="6" style="text-align:right;font-weight:700">Subtotal ${escHtml(sup)}:</td><td style="font-weight:800;color:#dc2626">${fV(subtotal)}</td><td></td></tr>`;
+    }).join('');
+  };
   const logoCXP=DB.config.logoData||'';
   const rncCXP=DB.config.rnc||'';
   const telCXP=DB.config.telefono||'';
@@ -11284,18 +11317,27 @@ function imprimirCXP(){
       ${totalUSD>0?`<div style="font-size:11px;color:#6b7280;margin-top:4px">Pendiente USD</div><div style="font-size:18px;font-weight:800;color:#2563eb">$${totalUSD.toLocaleString('en-US',{minimumFractionDigits:2})}</div>`:''}
     </div>
   </div>
+  ${gastosPend.length===0?`
+  <div style="text-align:center;padding:40px 20px;color:#6b7280;background:#f8fafc;border-radius:8px;margin-top:16px">
+    <div style="font-size:32px;margin-bottom:8px">✅</div>
+    <div style="font-size:14px;font-weight:700">No hay gastos de vehículo pendientes de pago${filtroSup||filtroVeh||filtroMoneda?' con el filtro aplicado':''}</div>
+  </div>`:''}
   ${gastosRD.length>0?`
-  <h4 class="rd">💰 Pendientes en RD$ — Pesos Dominicanos</h4>
-  <table><thead><tr><th>Fecha</th><th>Suplidor</th><th>Vehículo</th><th>Chasis</th><th>Tipo Gasto</th><th>Factura</th><th>Pagado</th><th>Pendiente</th><th>Estado</th></tr></thead>
-  <tbody>${generarFilas(gastosRD)}
-  <tr style="background:#fee2e2"><td colspan="7" style="font-weight:800;text-align:right">TOTAL PENDIENTE RD$:</td><td style="font-weight:800;color:#dc2626">${fmt(totalRD)}</td><td></td></tr>
+  <h4 class="rd">💰 Pendientes en RD$ — Pesos Dominicanos (por suplidor)</h4>
+  <table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Chasis</th><th>Tipo Gasto</th><th>Factura</th><th>Pagado</th><th>Pendiente</th><th>Estado</th></tr></thead>
+  <tbody>${generarPorSuplidor(gastosRD)}
+  <tr style="background:#fee2e2"><td colspan="6" style="font-weight:800;text-align:right">TOTAL PENDIENTE RD$:</td><td style="font-weight:800;color:#dc2626">${fmt(totalRD)}</td><td></td></tr>
   </tbody></table>`:''}
   ${gastosUSD.length>0?`
-  <h4 class="usd">💵 Pendientes en USD — Dólares</h4>
-  <table><thead><tr><th>Fecha</th><th>Suplidor</th><th>Vehículo</th><th>Chasis</th><th>Tipo Gasto</th><th>Factura</th><th>Pagado</th><th>Pendiente</th><th>Estado</th></tr></thead>
-  <tbody>${generarFilas(gastosUSD)}
-  <tr style="background:#dbeafe"><td colspan="7" style="font-weight:800;text-align:right">TOTAL PENDIENTE USD:</td><td style="font-weight:800;color:#2563eb">$${totalUSD.toLocaleString('en-US',{minimumFractionDigits:2})}</td><td></td></tr>
+  <h4 class="usd">💵 Pendientes en USD — Dólares (por suplidor)</h4>
+  <table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Chasis</th><th>Tipo Gasto</th><th>Factura</th><th>Pagado</th><th>Pendiente</th><th>Estado</th></tr></thead>
+  <tbody>${generarPorSuplidor(gastosUSD)}
+  <tr style="background:#dbeafe"><td colspan="6" style="font-weight:800;text-align:right">TOTAL PENDIENTE USD:</td><td style="font-weight:800;color:#2563eb">$${totalUSD.toLocaleString('en-US',{minimumFractionDigits:2})}</td><td></td></tr>
   </tbody></table>`:''}
+  ${gastosPend.length>0?`
+  <div class="tot" style="background:#0f172a;color:#fff;border-radius:8px;margin-top:16px">
+    <span>TOTAL ACUMULADO GENERAL (equivalente en RD$, tasa ${tasa}):&nbsp;&nbsp;${fmt(totalRD+totalUSD*tasa)}</span>
+  </div>`:''}
   <div class="noprint" style="margin-top:24px;text-align:center"><button onclick="window.print()" style="padding:10px 28px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>
   </body></html>`);
   win.document.close();
@@ -11719,27 +11761,63 @@ function confirmarAbonarCXC(id){
 }
 
 function imprimirCXC(){
-  const filtroMoneda=document.getElementById('cxc-filtro-moneda')?.value||'RD$';
   const tasa=parseFloat(DB.config.tasaCambio||60);
   const empresa=DB.config.empresa||'DealerSystem';
   const logo=DB.config.logoData||'';
   const rnc=DB.config.rnc||'';
   const tel=DB.config.telefono||'';
   const dir=DB.config.direccion||'';
-  const esUSD=filtroMoneda==='USD';
-  const fV=(n)=>esUSD?'$'+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2}):fmt(n);
 
-  let items=(DB.cxc||[]).filter(x=>{
+  const filtroStatus=document.getElementById('cxc-filtro-status')?.value||'PENDIENTE';
+  let todas=(DB.cxc||[]).filter(x=>x.status!=='SALDADO');
+  if(filtroStatus&&filtroStatus!=='TODOS')todas=todas.filter(x=>x.status===filtroStatus);
+  const itemsRD=todas.filter(x=>{
     const monedaItem=x.moneda||(DB.ventas.find(v=>v.id===x.ventaId)?.moneda)||'RD$';
-    return monedaItem===filtroMoneda;
-  }).filter(x=>x.status!=='SALDADO');
+    return monedaItem==='RD$';
+  });
+  const itemsUSD=todas.filter(x=>{
+    const monedaItem=x.moneda||(DB.ventas.find(v=>v.id===x.ventaId)?.moneda)||'RD$';
+    return monedaItem==='USD';
+  });
 
-  const totalGeneral=items.reduce((a,x)=>a+parseFloat(x.total||0),0);
-  const totalCobrado=items.reduce((a,x)=>a+parseFloat(x.abonado||0),0);
-  const totalPend=items.reduce((a,x)=>a+parseFloat(x.saldo||0),0);
+  const generarTabla=(items,esUSD)=>{
+    const fV=(n)=>esUSD?'$'+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2}):fmt(n);
+    const totalGeneral=items.reduce((a,x)=>a+parseFloat(x.total||0),0);
+    const totalCobrado=items.reduce((a,x)=>a+parseFloat(x.abonado||0),0);
+    const totalPend=items.reduce((a,x)=>a+parseFloat(x.saldo||0),0);
+    const colorPrincipal=esUSD?'#2563eb':'#d97706';
+    return`
+    <h3 style="margin:22px 0 4px">${esUSD?'💵 USD — DÓLARES':'💰 RD$ — PESOS DOMINICANOS'}</h3>
+    <div class="tots">
+      <div class="tot" style="background:#f1f5f9"><label>Total por Cobrar</label><span>${fV(totalGeneral)}</span></div>
+      <div class="tot" style="background:#dcfce7"><label style="color:#16a34a">Total Cobrado</label><span style="color:#16a34a">${fV(totalCobrado)}</span></div>
+      <div class="tot" style="background:${esUSD?'#dbeafe':'#fef3c7'}"><label style="color:${colorPrincipal}">Saldo Pendiente</label><span style="color:${colorPrincipal}">${fV(totalPend)}</span></div>
+    </div>
+    <table><thead><tr><th>Factura</th><th>Cliente</th><th>Vehículo</th><th>Total</th><th>Cobrado</th><th>Saldo</th><th>Vence</th><th>Estado</th></tr></thead>
+    <tbody>${items.length?items.map(x=>`<tr>
+      <td style="font-family:monospace;font-weight:700">${escHtml(x.factura||'—')}</td>
+      <td style="font-weight:700">${escHtml(x.cliente||'—')}</td>
+      <td style="font-size:11px">${escHtml(x.vehiculo||'—')}</td>
+      <td>${fV(x.total)}</td>
+      <td style="color:#16a34a">${fV(x.abonado||0)}</td>
+      <td style="font-weight:800;color:${colorPrincipal}">${fV(x.saldo||0)}</td>
+      <td style="color:${x.fechaVence&&x.fechaVence<=today()?'#dc2626':'#6b7280'}">${fmtDate(x.fechaVence)||'—'}</td>
+      <td>${x.status}</td>
+    </tr>`).join(''):`<tr><td colspan="8" style="text-align:center;padding:20px;color:#6b7280">Sin cuentas pendientes en ${esUSD?'USD':'RD$'}</td></tr>`}
+    <tr style="background:${esUSD?'#dbeafe':'#fef3c7'}">
+      <td colspan="5" style="font-weight:800;text-align:right">TOTAL PENDIENTE ${esUSD?'USD':'RD$'}:</td>
+      <td style="font-weight:800;font-size:14px;color:${colorPrincipal}">${fV(totalPend)}</td>
+      <td colspan="2"></td>
+    </tr>
+    </tbody></table>`;
+  };
+
+  const totalPendRD=itemsRD.reduce((a,x)=>a+parseFloat(x.saldo||0),0);
+  const totalPendUSD=itemsUSD.reduce((a,x)=>a+parseFloat(x.saldo||0),0);
+
   const win=window.open('','_blank','width=1000,height=700');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>CxC ${filtroMoneda} — ${escHtml(empresa)}</title>
+  <title>CxC — ${escHtml(empresa)}</title>
   <style>body{font-family:Arial,sans-serif;padding:24px;font-size:12px;color:#0f172a}
   h2{font-size:18px;margin:0}h3{font-size:13px;margin:4px 0;color:#475569}
   table{width:100%;border-collapse:collapse;margin-top:14px}
@@ -11751,45 +11829,27 @@ function imprimirCXC(){
   .tot label{font-size:10px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px}
   .tot span{font-size:18px;font-weight:800;display:block}
   @media print{.noprint{display:none}}</style></head><body>
-  <div style="border-bottom:3px solid ${esUSD?'#2563eb':'#d97706'};padding-bottom:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start">
+  <div style="border-bottom:3px solid #083a70;padding-bottom:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start">
     <div>
       ${logo?`<img src="${logo}" style="max-height:55px;max-width:150px;object-fit:contain;margin-bottom:6px;display:block">`:''} 
       <h2>${escHtml(empresa)}</h2>
       ${rnc?`<div style="font-size:11px;color:#475569">RNC: ${escHtml(rnc)}</div>`:''}
       ${tel?`<div style="font-size:11px;color:#475569">Tel: ${escHtml(tel)}</div>`:''}
       ${dir?`<div style="font-size:11px;color:#475569">${escHtml(dir)}</div>`:''}
-      <h3>CUENTAS POR COBRAR — ${esUSD?'USD DÓLARES':'RD$ PESOS'}</h3>
-      <div style="font-size:11px;color:#6b7280">Fecha: ${fmtDate(today())}${esUSD?' | Tasa: RD$ '+tasa+' x USD':''}</div>
+      <h3>CUENTAS POR COBRAR — RD$ Y USD</h3>
+      <div style="font-size:11px;color:#6b7280">Fecha: ${fmtDate(today())} | Tasa: RD$ ${tasa} x USD</div>
     </div>
     <div style="text-align:right">
-      <div style="font-size:10px;color:#6b7280">TOTAL PENDIENTE</div>
-      <div style="font-size:22px;font-weight:800;color:${esUSD?'#2563eb':'#d97706'}">${fV(totalPend)}</div>
+      <div style="font-size:10px;color:#6b7280">PENDIENTE RD$</div>
+      <div style="font-size:18px;font-weight:800;color:#d97706">${fmt(totalPendRD)}</div>
+      <div style="font-size:10px;color:#6b7280;margin-top:4px">PENDIENTE USD</div>
+      <div style="font-size:18px;font-weight:800;color:#2563eb">$${totalPendUSD.toLocaleString('en-US',{minimumFractionDigits:2})}</div>
     </div>
   </div>
-  <div class="tots">
-    <div class="tot" style="background:#f1f5f9"><label>Total por Cobrar</label><span>${fV(totalGeneral)}</span></div>
-    <div class="tot" style="background:#dcfce7"><label style="color:#16a34a">Total Cobrado</label><span style="color:#16a34a">${fV(totalCobrado)}</span></div>
-    <div class="tot" style="background:${esUSD?'#dbeafe':'#fef3c7'}"><label style="color:${esUSD?'#2563eb':'#d97706'}">Saldo Pendiente</label><span style="color:${esUSD?'#2563eb':'#d97706'}">${fV(totalPend)}</span></div>
-  </div>
-  <table><thead><tr><th>Factura</th><th>Cliente</th><th>Vehículo</th><th>Total</th><th>Cobrado</th><th>Saldo</th><th>Vence</th><th>Estado</th></tr></thead>
-  <tbody>${items.map(x=>`<tr>
-    <td style="font-family:monospace;font-weight:700">${escHtml(x.factura||'—')}</td>
-    <td style="font-weight:700">${escHtml(x.cliente||'—')}</td>
-    <td style="font-size:11px">${escHtml(x.vehiculo||'—')}</td>
-    <td>${fV(x.total)}</td>
-    <td style="color:#16a34a">${fV(x.abonado||0)}</td>
-    <td style="font-weight:800;color:${esUSD?'#2563eb':'#d97706'}">${fV(x.saldo||0)}</td>
-    <td style="color:${x.fechaVence&&x.fechaVence<=today()?'#dc2626':'#6b7280'}">${fmtDate(x.fechaVence)||'—'}</td>
-    <td>${x.status}</td>
-  </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:20px;color:#6b7280">Sin cuentas pendientes en ${filtroMoneda}</td></tr>'}
-  <tr style="background:${esUSD?'#dbeafe':'#fef3c7'}">
-    <td colspan="5" style="font-weight:800;text-align:right">TOTAL PENDIENTE ${filtroMoneda}:</td>
-    <td style="font-weight:800;font-size:14px;color:${esUSD?'#2563eb':'#d97706'}">${fV(totalPend)}</td>
-    <td colspan="2"></td>
-  </tr>
-  </tbody></table>
+  ${generarTabla(itemsRD,false)}
+  ${generarTabla(itemsUSD,true)}
   <div class="noprint" style="margin-top:20px;text-align:center">
-    <button onclick="window.print()" style="padding:10px 24px;background:${esUSD?'#2563eb':'#d97706'};color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+    <button onclick="window.print()" style="padding:10px 24px;background:#083a70;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
   </div>
   </body></html>`);
   win.document.close();

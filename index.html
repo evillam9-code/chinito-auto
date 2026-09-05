@@ -464,6 +464,13 @@ const fmtUSD=n=>'USD '+parseFloat(n||0).toLocaleString('en-US',{minimumFractionD
 const today=()=>new Date().toISOString().split('T')[0];
 const fmtDate=d=>{if(!d)return '—';try{return new Date(d+'T12:00:00').toLocaleDateString('es-DO',{day:'2-digit',month:'short',year:'numeric'})}catch{return d}};
 const uid=()=>'id'+Date.now()+Math.random().toString(36).slice(2,6);
+function openPopup(html){
+  const win=window.open('','_blank','width=1100,height=750');
+  if(!win){toast('⚠️ El navegador bloqueó la ventana emergente — permite pop-ups para exportar','error');return null;}
+  win.document.write(html);
+  win.document.close();
+  return win;
+}
 function genFactura(){const nums=DB.ventas.map(v=>{const m=(v.factura||'').match(/(\d+)$/);return m?parseInt(m[1]):0;});const next=(nums.length?Math.max(...nums):0)+1;return 'FAC-'+String(next).padStart(6,'0');}
 const escHtml=s=>{const d=document.createElement('div');d.textContent=s||'';return d.innerHTML};
 // ══ BANCOS Y CUENTAS HELPER ══
@@ -3071,7 +3078,7 @@ function imprimirGastosVehiculo(vid){
   if(tasaStr===null)return;
   const tasa=parseFloat(tasaStr)||tasaActual;
   // Usar función general con gastos de este vehículo
-  _generarPDFGastosVeh(gastos,tasa,'',vid,true);
+  _generarPDFGastosVeh(gastos,tasa,'',vid,true,'','');
 }
 
 
@@ -7540,10 +7547,11 @@ function exportarGastosVehPDF(){
   const tasaStr=prompt('💱 Ingresa la tasa del dólar del día (RD$ por 1 USD):',tasaActual);
   if(tasaStr===null)return; // canceló
   const tasa=parseFloat(tasaStr)||tasaActual;
-  _generarPDFGastosVeh(gastos,tasa,filtroSup,filtroVeh,false);
+  _generarPDFGastosVeh(gastos,tasa,filtroSup,filtroVeh,false,filtroDesde,filtroHasta);
 }
 
-function _generarPDFGastosVeh(gastos,tasa,filtroSup,filtroVeh,soloUnVeh){
+function _generarPDFGastosVeh(gastos,tasa,filtroSup,filtroVeh,soloUnVeh,filtroDesde,filtroHasta){
+  filtroDesde=filtroDesde||'';filtroHasta=filtroHasta||'';
   const empresa=DB.config.empresa||'MAEDIG';
   const logo=DB.config.logoData||'';
   const rnc=DB.config.rnc||'';
@@ -7601,6 +7609,11 @@ function _generarPDFGastosVeh(gastos,tasa,filtroSup,filtroVeh,soloUnVeh){
     </div>
     <div style="text-align:right;font-size:11px;color:#6b7280">${gastos.length} registro(s)</div>
   </div>
+  ${gastos.length===0?`
+  <div style="text-align:center;padding:40px 20px;color:#6b7280;background:#f8fafc;border-radius:8px;margin-top:16px">
+    <div style="font-size:32px;margin-bottom:8px">✅</div>
+    <div style="font-size:14px;font-weight:700">No hay gastos de vehículo que coincidan con el filtro aplicado</div>
+  </div>`:''}
   ${gastosRD.length>0?`
   <h4 class="rd">💰 Gastos en RD$ — Pesos Dominicanos</h4>
   <table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Suplidor</th><th>Tipo Gasto</th><th>Cuenta</th><th>Factura RD$</th><th>Pagado RD$</th><th>Pendiente RD$</th><th>Estado</th></tr></thead>
